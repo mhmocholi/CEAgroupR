@@ -1,0 +1,31 @@
+Package: CEAgroupR
+Type: Package
+Title: Grouped Incremental Cost-Effectiveness and Cost-Utility Analysis in R
+Version: 0.1.0
+Authors@R: 
+    person("Miguel A.", "Hernández-Mocholí",
+           email = "mhmocholi@unex.es",
+           role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0001-6914-9282"))
+Description: Tools to perform incremental cost-effectiveness and cost-utility analyses 
+    with a focus on subgroup-level evaluations. The package provides functions to compute 
+    incremental cost-effectiveness ratios (ICERs), summarize outcomes, and generate 
+    cost-effectiveness/cost-utility plots across different subpopulations. 
+    It is designed to support reproducible economic evaluations and facilitate 
+    subgroup analyses in health economics research.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Depends: R (>= 4.1.0)
+Imports: 
+    dplyr,
+    ggplot2,
+    magrittr,
+    tibble,
+    stats
+Suggests: 
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
