@@ -1,30 +1,43 @@
-#' Print method for cea_base objects
+#' Print method for CEA base objects
 #'
-#' Provides a concise and clean console output for `cea_base` objects.
-#' This print method hides the internal `boot` call and dataset details,
-#' displaying only the relevant summary of the bootstrap analysis.
+#' Provides a compact and readable summary of bootstrap results
+#' (ICER, cost, effect, and NMB) using the simplified object structure.
 #'
 #' @param x An object of class `cea_base`.
-#' @param ... Additional arguments (not used).
+#' @param digits Number of digits to display (default = 3).
+#' @param ... Additional arguments (ignored).
 #' @export
-print.cea_base <- function(x, ...) {
-  cat("CEA bootstrap analysis\n")
-  cat("----------------------\n")
+print.cea_base <- function(x, digits = 3, ...) {
+  cat("STRATIFIED BOOTSTRAP SUMMARY\n\n")
 
-  # Show number of bootstrap replications
-  if (!is.null(x$boot_results$R)) {
-    cat("Bootstrap replications:", x$boot_results$R, "\n\n")
+  # ---- Validate object ----
+  if (is.null(x$bootstrap_samples) || nrow(x$bootstrap_samples) == 0) {
+    cat("No bootstrap samples available.\n")
+    return(invisible(x))
   }
 
-  # Show estimated parameters
-  if (!is.null(colnames(x$boot_results$t))) {
-    params <- colnames(x$boot_results$t)
-    cat("Estimated parameters:\n")
-    cat(paste(params, collapse = ", "), "\n\n")
-  }
+  # ---- Extract bootstrap samples ----
+  t_reps <- x$bootstrap_samples
 
-  # Guidance for the user
-  cat("Use summary() for detailed results.\n")
+  # ---- Compute summary statistics ----
+  t0 <- colMeans(t_reps, na.rm = TRUE)
+  boot_bias <- rep(NA, length(t0))
+  boot_se   <- apply(t_reps, 2, sd, na.rm = TRUE)
 
+  # ---- Format table ----
+  stats <- data.frame(
+    Statistic = names(t0),
+    Mean = round(t0, digits),
+    StdError = round(boot_se, digits)
+  )
+
+  # ---- Format and align ----
+  stats$Statistic <- format(stats$Statistic, justify = "left")
+  stats$Mean <- format(round(stats$Mean, digits), nsmall = digits, justify = "right")
+  stats$StdError <- format(round(stats$StdError, digits), nsmall = digits, justify = "right")
+
+  # ---- Print ----
+  print(stats, row.names = FALSE, right = TRUE)
+  cat("\n")
   invisible(x)
 }

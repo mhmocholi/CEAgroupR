@@ -16,12 +16,14 @@ Description: Tools to perform incremental cost-effectiveness and cost-utility an
 License: MIT + file LICENSE
 Encoding: UTF-8
 Depends: R (>= 4.1.0)
-Imports: 
+Imports:
     dplyr,
     ggplot2,
-    magrittr,
     tibble,
-    stats
+    magrittr,
+    MASS,
+    boot,
+    rlang
 Suggests: 
     knitr,
     rmarkdown,

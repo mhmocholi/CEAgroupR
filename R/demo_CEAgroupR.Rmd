@@ -1,0 +1,237 @@
+---
+title: "Demostración del paquete CEAgroupR"
+author: "Miguel Ángel Hernández Mocholí"
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output:
+  html_document:
+    theme: flatly
+    toc: true
+    toc_float: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+devtools::load_all(".")   # Carga el paquete desde el proyecto actual
+library(dplyr)
+library(ggplot2)
+```
+
+# Introducción
+
+Este documento muestra el flujo completo del paquete **CEAgroupR**, diseñado para realizar
+**análisis de coste-efectividad (CEA)** y **coste-utilidad (CUA)** con soporte para
+análisis por subgrupos y escenarios alternativos.
+
+El paquete permite:
+
+- Calcular de forma reproducible razones de coste-efectividad incremental (ICER)
+  y beneficio monetario neto (NMB) mediante *bootstrap* no paramétrico.  
+- Comparar resultados entre distintos **datasets** (escenarios o análisis de sensibilidad).  
+- Realizar análisis por **subgrupos** definidos por variables categóricas.  
+- Generar visualizaciones flexibles:
+  - Plano coste-efectividad (ICER plane)
+  - Curvas de aceptabilidad (CEAC)
+  - Curvas de valor esperado de información perfecta (EVPI)
+
+# 1. Estructura de los datos
+
+El paquete incluye dos datasets de ejemplo:
+
+```{r}
+data(cua_base)
+data(cua_base_discounted)
+
+head(cua_base)
+```
+
+Cada dataset contiene:
+
+| Variable | Descripción |
+|-----------|-------------|
+| `id` | Identificador individual |
+| `group` | Grupo de comparación ("g0" = usual care, "g1" = intervención) |
+| `cost_total` | Coste total individual |
+| `effect` | Efectividad o utilidad (p. ej., QALYs) |
+| `diabetes` | Indicador de diabetes ("yes"/"no") |
+| `HTA` | Hipertensión ("yes"/"no") |
+| `n_comorbidities` | Número de comorbilidades (0–3) |
+
+El dataset `cua_base_discounted` es una versión con un 10% de descuento en costes
+para ilustrar un **análisis de sensibilidad determinístico**.
+
+# 2. Generación de resultados
+
+```{r}
+results <- icers_base(
+  data = list(
+    base_case = cua_base,
+    discounted = cua_base_discounted
+  ),
+  group = "group",
+  cost = "cost_total",
+  effect = "effect",
+  lambda = 25000,
+  R = 500,
+  subgroup_vars = c("diabetes", "HTA")
+)
+```
+
+El objeto `results` incluye:
+
+- Resultados *bootstrap* globales (`$Overall`)  
+- Resultados por subgrupos (`$Subgroups`)  
+- Tabla combinada de réplicas (`$combined_replicates`)
+
+```{r}
+str(results, max.level = 2)
+```
+
+## 2.1. Resumen numérico
+
+```{r}
+results$base_case
+```
+
+# 3. Visualizaciones
+
+Las funciones gráficas del paquete comparten la misma estructura flexible
+(`mode`, `facet_by`, `palette`, etc.).
+
+## 3.1. Plano coste-efectividad (ICER plane)
+
+**Comparación global**
+
+```{r}
+plot.icers(results, mode = "overall")
+```
+
+**Comparación por datasets**
+
+```{r}
+plot.icers(results, mode = "overall", facet = TRUE)
+```
+
+**Subgrupos por variable**
+
+```{r}
+plot.icers(
+  results,
+  mode = "subgroups",
+  subgroups = c("diabetes", "HTA"),
+  facet_by = "vars"
+)
+```
+
+**Subgrupos por nivel**
+
+```{r}
+plot.icers(
+  results,
+  mode = "subgroups",
+  subgroups = c("diabetes", "HTA"),
+  facet_by = "levels"
+)
+```
+
+**Comparación datasets × subgrupos**
+
+```{r}
+plot.icers(
+  results,
+  mode = "datasets_subgroups",
+  subgroups = c("diabetes", "HTA"),
+  facet_by = "vars"
+)
+```
+
+## 3.2. Curvas de aceptabilidad (CEAC)
+
+**Global**
+
+```{r}
+plot.ceac(results, mode = "overall", lambda_range = c(0, 80000))
+```
+
+**Por variable (Diabetes, HTA)**
+
+```{r}
+plot.ceac(
+  results,
+  mode = "subgroups",
+  subgroups = c("diabetes", "HTA"),
+  facet_by = "vars"
+)
+```
+
+**Por nivel (yes/no)**
+
+```{r}
+plot.ceac(
+  results,
+  mode = "subgroups",
+  subgroups = c("diabetes", "HTA"),
+  facet_by = "levels"
+)
+```
+
+**Comparación datasets × subgrupos**
+
+```{r}
+plot.ceac(
+  results,
+  mode = "datasets_subgroups",
+  subgroups = c("diabetes", "HTA"),
+  facet_by = "vars"
+)
+```
+
+## 3.3. Curvas de valor esperado de información perfecta (EVPI)
+
+**Global**
+
+```{r}
+plot.evpi(results, mode = "overall")
+```
+
+**Por variable**
+
+```{r}
+plot.evpi(
+  results,
+  mode = "subgroups",
+  subgroups = c("diabetes", "HTA"),
+  facet_by = "vars"
+)
+```
+
+**Por nivel**
+
+```{r}
+plot.evpi(
+  results,
+  mode = "subgroups",
+  subgroups = c("diabetes", "HTA"),
+  facet_by = "levels"
+)
+```
+
+**Comparación datasets × subgrupos**
+
+```{r}
+plot.evpi(
+  results,
+  mode = "datasets_subgroups",
+  subgroups = c("diabetes", "HTA"),
+  facet_by = "vars"
+)
+```
+
+# 4. Conclusión
+
+El flujo mostrado en este documento demuestra el funcionamiento modular del paquete **CEAgroupR**:  
+desde la generación de réplicas *bootstrap* hasta la visualización comparativa.
+
+La arquitectura de modos y facetas ofrece una gran flexibilidad para realizar
+análisis coste-efectividad globales, por subgrupos y entre escenarios, manteniendo
+una presentación coherente y reproducible.

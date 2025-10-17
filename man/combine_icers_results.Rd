@@ -4,19 +4,16 @@
 \alias{combine_icers_results}
 \title{Combine bootstrap samples from one or several CEA analyses}
 \usage{
-combine_icers_results(..., labels = NULL)
+combine_icers_results(...)
 }
 \arguments{
-\item{...}{One or more objects of class \code{cea_results}, as returned by
-\code{\link{icers_base}}.}
-
-\item{labels}{Optional character vector with custom labels for each object.
-If not provided, labels are generated automatically as "set_1", "set_2", etc.}
+\item{...}{One or more objects of class \code{cea_results} or a single object of class
+\code{cea_results_list}, as returned by \code{\link{icers_base}}.}
 }
 \value{
 A tibble containing all bootstrap replicates with the following columns:
 \itemize{
-\item \code{source}: name or label of the originating object.
+\item \code{dataset}: dataset name (if multiple datasets were analysed).
 \item \code{level}: "Overall" or name of the subgroup variable.
 \item \code{subgroup}: subgroup level (if applicable).
 \item \code{replicate}: bootstrap replicate index.
@@ -27,10 +24,10 @@ A tibble containing all bootstrap replicates with the following columns:
 }
 \description{
 Combines the bootstrap replicates contained in one or more objects of class
-\code{cea_results} into a single tidy data frame. The resulting dataset includes
-all bootstrap samples for the overall analysis and any available subgroup
-analyses. This function is intended to facilitate plotting and comparison
-across different analyses.
+\code{cea_results} or \code{cea_results_list} into a single tidy data frame. The resulting
+dataset includes all bootstrap samples for the overall analysis and any available
+subgroup analyses. This function is intended to facilitate plotting and comparison
+across different analyses or datasets.
 }
 \examples{
 data(cua_base)

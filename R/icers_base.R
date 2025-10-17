@@ -4,9 +4,12 @@
 #' incremental effectiveness, ICER, and Net Monetary Benefit (NMB) between two
 #' comparison groups (e.g., usual care vs. intervention). The function also
 #' reports group-specific mean costs and effects, and optionally performs the
-#' analysis by predefined subgroups.
+#' analysis by predefined subgroups. It supports multiple datasets, allowing
+#' deterministic sensitivity analyses or scenario comparisons.
 #'
-#' @param data A data frame containing all variables required for the analysis.
+#' @param data A data frame or a named list of data frames containing all
+#'   variables required for the analysis. All datasets in the list must share
+#'   the same structure and variable names.
 #' @param group A string indicating the column name that defines the two
 #'   comparison groups (reference and intervention).
 #' @param cost A string indicating the column name for total cost.
@@ -19,20 +22,17 @@
 #' @param subgroup_vars Optional character vector. Names of subgroup variables
 #'   to stratify the analysis.
 #'
-#' @return A list of class `cea_results` containing:
-#' \itemize{
-#'   \item \code{Overall}: A `cea_base` object with results for the full sample.
-#'   \item \code{Subgroups}: A named list of subgroup-specific results.
-#' }
+#' @return If a single data frame is supplied, returns a list of class
+#'   \code{cea_results} containing:
+#'   \itemize{
+#'     \item \code{Overall}: A \code{cea_base} object with results for the full sample.
+#'     \item \code{Subgroups}: A named list of subgroup-specific results.
+#'     \item \code{combined_replicates}: A tibble combining all bootstrap samples.
+#'   }
 #'
-#' Each `cea_base` object includes:
-#' \itemize{
-#'   \item \code{boot_results}: The `boot()` object.
-#'   \item \code{boot_ci}: Bootstrap confidence intervals for all parameters.
-#'   \item \code{bootstrap_samples}: Data frame of bootstrap replicates with 8
-#'   columns: Delta_Cost, Delta_Effect, ICER, Mean_Cost_g1, Mean_Cost_g2,
-#'   Mean_Effect_g1, Mean_Effect_g2, NMB.
-#' }
+#'   If a list of data frames is supplied, returns a named list of
+#'   \code{cea_results} objects (class \code{cea_results_list}) plus the element
+#'   \code{combined_replicates} that aggregates results across datasets.
 #'
 #' @importFrom boot boot boot.ci
 #' @importFrom dplyr filter
@@ -109,22 +109,17 @@ icers_base <- function(data, group, cost, effect,
       "Mean_Effect_g1", "Mean_Effect_g2", "NMB"
     )
 
-    # Assign names within boot object
     colnames(boot_res$t) <- stat_names
     names(boot_res$t0) <- stat_names
-
-    # Restore call to boot
     boot_res$call$data <- substitute(df)
 
-    # Compute confidence intervals
     ci_list <- setNames(lapply(seq_along(stat_names),
                                function(i) safe_ci(boot_res, i)),
                         stat_names)
 
-    # Bootstrap samples table
     bootstrap_df <- as.data.frame(boot_res$t)
     names(bootstrap_df) <- stat_names
-    bootstrap_df <- as.data.frame(lapply(bootstrap_df, function(x) round(x, 3)))
+    bootstrap_df <- as.data.frame(lapply(bootstrap_df, as.numeric))
 
     out <- list(
       boot_results = boot_res,
@@ -135,20 +130,47 @@ icers_base <- function(data, group, cost, effect,
     out
   }
 
-  overall_result <- analyze_data(data)
+  # ---- Wrapper for subgroups ----
+  analyze_with_subgroups <- function(df) {
+    overall_result <- analyze_data(df)
+    subgroup_results <- NULL
 
-  subgroup_results <- NULL
-  if (!is.null(subgroup_vars)) {
-    subgroup_results <- lapply(subgroup_vars, function(var) {
-      sub_data <- data %>% dplyr::filter(!is.na(.data[[var]]))
-      split_data <- split(sub_data, sub_data[[var]])
-      split_data <- Filter(function(df) length(unique(df[[group]])) == 2, split_data)
-      lapply(split_data, analyze_data)
-    })
-    names(subgroup_results) <- subgroup_vars
+    if (!is.null(subgroup_vars)) {
+      subgroup_results <- lapply(subgroup_vars, function(var) {
+        sub_data <- df %>% dplyr::filter(!is.na(.data[[var]]))
+        split_data <- split(sub_data, sub_data[[var]])
+        split_data <- Filter(function(x) length(unique(x[[group]])) == 2, split_data)
+        lapply(split_data, analyze_data)
+      })
+      names(subgroup_results) <- subgroup_vars
+    }
+
+    structure(
+      list(Overall = overall_result, Subgroups = subgroup_results),
+      class = "cea_results"
+    )
   }
 
-  structure(list(Overall = overall_result,
-                 Subgroups = subgroup_results),
-            class = "cea_results")
+  # ---- Main logic: single dataset vs. list of datasets ----
+  if (is.data.frame(data)) {
+    result <- analyze_with_subgroups(data)
+  } else if (is.list(data)) {
+    if (is.null(names(data)) || any(names(data) == "")) {
+      names(data) <- paste0("dataset_", seq_along(data))
+    }
+
+    result <- lapply(data, analyze_with_subgroups)
+    class(result) <- c("cea_results_list", "list")
+  } else {
+    stop("`data` must be either a data frame or a named list of data frames.")
+  }
+
+  # ---- Combine all bootstrap replicates into one tidy table ----
+  if (inherits(result, "cea_results_list")) {
+    result$combined_replicates <- combine_icers_results(result)
+  } else if (inherits(result, "cea_results")) {
+    result$combined_replicates <- combine_icers_results(result)
+  }
+
+  return(result)
 }

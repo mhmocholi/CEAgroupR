@@ -15,7 +15,6 @@
 }
 \description{
 Displays the main summary table of results directly when printing a
-\code{cea_results} object. This method automatically calls \code{summary()} internally
-and prints the formatted table for both the overall analysis and all
-subgroup analyses.
+\code{cea_results} object. It extracts means and 95\% confidence intervals
+from the stored bootstrap results for both the overall and subgroup analyses.
 }

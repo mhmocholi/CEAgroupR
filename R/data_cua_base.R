@@ -1,10 +1,34 @@
-#' Example dataset for cost-utility analysis (base case)
+#' Example datasets for cost-effectiveness analysis
 #'
-#' Simulated dataset representing a simple scenario for incremental cost-utility
-#' analysis between two treatment groups (g0 and g1). It includes total cost,
-#' a single measure of effectiveness (QALYs or utilities), and several subgroup
-#' variables for stratified analyses.
+#' These simulated datasets are provided for demonstrating the functionality of
+#' the \code{CEAgroupR} package. They contain example data for cost-utility or
+#' cost-effectiveness analyses with subgroups.
 #'
-#' @format A tibble with 200 observations and 7 variables:
-#' ...
+#' @format Two data frames with 200 observations and 7 variables each:
+#' \describe{
+#'   \item{id}{Individual identifier.}
+#'   \item{group}{Comparison group ("g0" = usual care, "g1" = intervention).}
+#'   \item{cost_total}{Total cost per individual.}
+#'   \item{effect}{Utility or effectiveness measure (e.g., QALYs).}
+#'   \item{diabetes}{Subgroup indicator ("yes"/"no").}
+#'   \item{HTA}{Hypertension indicator ("yes"/"no").}
+#'   \item{n_comorbidities}{Number of comorbid conditions (0–3).}
+#' }
+#'
+#' @details
+#' The \code{cua_base_discounted} dataset applies a 10\% linear cost reduction
+#' to the \code{cua_base} dataset, simulating a deterministic sensitivity
+#' analysis (e.g., cost discounting scenario).
+#'
+#' @examples
+#' data(cua_base)
+#' head(cua_base)
+#'
+#' data(cua_base_discounted)
+#' head(cua_base_discounted)
+#'
+#' @name example_datasets
 "cua_base"
+
+#' @rdname example_datasets
+"cua_base_discounted"

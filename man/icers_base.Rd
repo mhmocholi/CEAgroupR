@@ -16,7 +16,9 @@ icers_base(
 )
 }
 \arguments{
-\item{data}{A data frame containing all variables required for the analysis.}
+\item{data}{A data frame or a named list of data frames containing all
+variables required for the analysis. All datasets in the list must share
+the same structure and variable names.}
 
 \item{group}{A string indicating the column name that defines the two
 comparison groups (reference and intervention).}
@@ -37,25 +39,23 @@ effectiveness (e.g., QALYs, life-years).}
 to stratify the analysis.}
 }
 \value{
-A list of class \code{cea_results} containing:
+If a single data frame is supplied, returns a list of class
+\code{cea_results} containing:
 \itemize{
 \item \code{Overall}: A \code{cea_base} object with results for the full sample.
 \item \code{Subgroups}: A named list of subgroup-specific results.
+\item \code{combined_replicates}: A tibble combining all bootstrap samples.
 }
 
-Each \code{cea_base} object includes:
-\itemize{
-\item \code{boot_results}: The \code{boot()} object.
-\item \code{boot_ci}: Bootstrap confidence intervals for all parameters.
-\item \code{bootstrap_samples}: Data frame of bootstrap replicates with 8
-columns: Delta_Cost, Delta_Effect, ICER, Mean_Cost_g1, Mean_Cost_g2,
-Mean_Effect_g1, Mean_Effect_g2, NMB.
-}
+If a list of data frames is supplied, returns a named list of
+\code{cea_results} objects (class \code{cea_results_list}) plus the element
+\code{combined_replicates} that aggregates results across datasets.
 }
 \description{
 Performs nonparametric bootstrap resampling to estimate incremental cost,
 incremental effectiveness, ICER, and Net Monetary Benefit (NMB) between two
 comparison groups (e.g., usual care vs. intervention). The function also
 reports group-specific mean costs and effects, and optionally performs the
-analysis by predefined subgroups.
+analysis by predefined subgroups. It supports multiple datasets, allowing
+deterministic sensitivity analyses or scenario comparisons.
 }

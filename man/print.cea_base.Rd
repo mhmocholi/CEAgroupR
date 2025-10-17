@@ -2,17 +2,18 @@
 % Please edit documentation in R/print.cea_base.R
 \name{print.cea_base}
 \alias{print.cea_base}
-\title{Print method for cea_base objects}
+\title{Print method for CEA base objects}
 \usage{
-\method{print}{cea_base}(x, ...)
+\method{print}{cea_base}(x, digits = 3, ...)
 }
 \arguments{
 \item{x}{An object of class \code{cea_base}.}
 
-\item{...}{Additional arguments (not used).}
+\item{digits}{Number of digits to display (default = 3).}
+
+\item{...}{Additional arguments (ignored).}
 }
 \description{
-Provides a concise and clean console output for \code{cea_base} objects.
-This print method hides the internal \code{boot} call and dataset details,
-displaying only the relevant summary of the bootstrap analysis.
+Provides a compact and readable summary of bootstrap results
+(ICER, cost, effect, and NMB) using the simplified object structure.
 }
