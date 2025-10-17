@@ -1,6 +1,6 @@
 ---
 title: "Demostración del paquete CEAgroupR"
-author: "Miguel Ángel Hernández Mocholí"
+author: "Proyecto de Tesis - Análisis de Coste-Utilidad por Subgrupos"
 date: "`r format(Sys.Date(), '%d de %B de %Y')`"
 output:
   html_document:
@@ -233,5 +233,20 @@ El flujo mostrado en este documento demuestra el funcionamiento modular del paqu
 desde la generación de réplicas *bootstrap* hasta la visualización comparativa.
 
 La arquitectura de modos y facetas ofrece una gran flexibilidad para realizar
-análisis coste-efectividad globales, por subgrupos y entre escenarios, manteniendo
-una presentación coherente y reproducible.
+análisis coste-efectividad globales, por subgrupos y entre escenarios,
+manteniendo una presentación coherente y reproducible.
+
+# 5. Apéndice técnico: Documentación de funciones
+
+La documentación completa de cada función puede abrirse desde los enlaces siguientes.  
+Los archivos `.html` de ayuda fueron generados con la función `tools::Rd2HTML()`
+a partir de los archivos `.Rd` en la carpeta `man/`.
+
+> 💡 Todos los enlaces funcionan en local; asegúrate de que los archivos `.html`
+> estén ubicados en el mismo nivel de carpeta que este documento (o ajusta las rutas `../` si el Rmd está dentro de `/R`).
+
+- [icers_base](../icers_base.html)
+- [combine_icers_results](../combine_icers_results.html)
+- [plot.icers](../plot.icers.html)
+- [plot.ceac](../plot.ceac.html)
+- [plot.evpi](../plot.evpi.html)
