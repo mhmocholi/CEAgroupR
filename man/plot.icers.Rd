@@ -11,7 +11,11 @@
   lambda = NULL,
   facet = FALSE,
   facet_by = c("vars", "levels"),
-  alpha = 0.5,
+  show_means = TRUE,
+  show_contours = TRUE,
+  kde_contour = 0.95,
+  kde_n = 200,
+  alpha = NULL,
   size = 1,
   palette = "Set2"
 )
@@ -33,7 +37,15 @@ variables to include (for modes involving subgroups).}
 \item{facet_by}{Character. For subgroup modes, determines the faceting scheme:
 \code{"vars"} (facet by subgroup variable) or \code{"levels"} (facet by subgroup level).}
 
-\item{alpha}{Transparency for points (default = 0.5).}
+\item{show_means}{Logical. If TRUE, adds a cross at the mean of each group/dataset.}
+
+\item{show_contours}{Logical. If TRUE, adds 2D KDE density contours.}
+
+\item{kde_contour}{Numeric vector with desired contour percentiles (default = 0.95).}
+
+\item{kde_n}{Integer, grid resolution for density estimation (default = 200).}
+
+\item{alpha}{Transparency for point clouds. If not specified, it is adjusted automatically.}
 
 \item{size}{Point size (default = 1).}
 

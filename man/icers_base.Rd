@@ -36,7 +36,8 @@ effectiveness (e.g., QALYs, life-years).}
 ("bca", "perc", "basic", "norm").}
 
 \item{subgroup_vars}{Optional character vector. Names of subgroup variables
-to stratify the analysis.}
+to stratify the analysis. These variables will be automatically converted
+to factors (if not already) to ensure consistent subgrouping.}
 }
 \value{
 If a single data frame is supplied, returns a list of class
@@ -45,11 +46,12 @@ If a single data frame is supplied, returns a list of class
 \item \code{Overall}: A \code{cea_base} object with results for the full sample.
 \item \code{Subgroups}: A named list of subgroup-specific results.
 \item \code{combined_replicates}: A tibble combining all bootstrap samples.
+\item \code{settings}: A list with metadata (analysis parameters and reproducibility info).
 }
 
 If a list of data frames is supplied, returns a named list of
 \code{cea_results} objects (class \code{cea_results_list}) plus the element
-\code{combined_replicates} that aggregates results across datasets.
+\code{combined_replicates} and \code{settings}.
 }
 \description{
 Performs nonparametric bootstrap resampling to estimate incremental cost,

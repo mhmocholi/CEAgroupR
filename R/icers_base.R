@@ -20,7 +20,8 @@
 #' @param ci_type Character. Type of confidence interval for \code{boot.ci}
 #'   ("bca", "perc", "basic", "norm").
 #' @param subgroup_vars Optional character vector. Names of subgroup variables
-#'   to stratify the analysis.
+#'   to stratify the analysis. These variables will be automatically converted
+#'   to factors (if not already) to ensure consistent subgrouping.
 #'
 #' @return If a single data frame is supplied, returns a list of class
 #'   \code{cea_results} containing:
@@ -28,11 +29,12 @@
 #'     \item \code{Overall}: A \code{cea_base} object with results for the full sample.
 #'     \item \code{Subgroups}: A named list of subgroup-specific results.
 #'     \item \code{combined_replicates}: A tibble combining all bootstrap samples.
+#'     \item \code{settings}: A list with metadata (analysis parameters and reproducibility info).
 #'   }
 #'
 #'   If a list of data frames is supplied, returns a named list of
 #'   \code{cea_results} objects (class \code{cea_results_list}) plus the element
-#'   \code{combined_replicates} that aggregates results across datasets.
+#'   \code{combined_replicates} and \code{settings}.
 #'
 #' @importFrom boot boot boot.ci
 #' @importFrom dplyr filter
@@ -132,6 +134,16 @@ icers_base <- function(data, group, cost, effect,
 
   # ---- Wrapper for subgroups ----
   analyze_with_subgroups <- function(df) {
+
+    # Convert subgroup variables to factors automatically
+    if (!is.null(subgroup_vars)) {
+      for (v in subgroup_vars) {
+        if (!is.factor(df[[v]])) {
+          df[[v]] <- as.factor(df[[v]])
+        }
+      }
+    }
+
     overall_result <- analyze_data(df)
     subgroup_results <- NULL
 
@@ -151,25 +163,44 @@ icers_base <- function(data, group, cost, effect,
     )
   }
 
+  # ---- Create metadata (settings) ----
+  settings <- list(
+    call = match.call(),
+    lambda = lambda,
+    R = R,
+    subgroup_vars = subgroup_vars,
+    datasets = if (is.list(data)) names(data) else "single_dataset",
+    # Capture the numeric seed used to initialize the RNG
+    seed = if (exists(".Random.seed", envir = .GlobalEnv)) {
+      as.integer(get(".Random.seed", envir = .GlobalEnv)[2])
+    } else {
+      NULL
+    },
+    date = Sys.time()
+  )
+
   # ---- Main logic: single dataset vs. list of datasets ----
   if (is.data.frame(data)) {
     result <- analyze_with_subgroups(data)
+    result$combined_replicates <- combine_icers_results(result)
+    result$settings <- settings
+
   } else if (is.list(data)) {
     if (is.null(names(data)) || any(names(data) == "")) {
       names(data) <- paste0("dataset_", seq_along(data))
     }
 
+    # Run analyses for each dataset
     result <- lapply(data, analyze_with_subgroups)
     class(result) <- c("cea_results_list", "list")
+
+    # Add metadata
+    result$settings <- settings
+
+    # Combine results directly; combine_icers_results ignores non-result elements
+    result$combined_replicates <- combine_icers_results(result)
   } else {
     stop("`data` must be either a data frame or a named list of data frames.")
-  }
-
-  # ---- Combine all bootstrap replicates into one tidy table ----
-  if (inherits(result, "cea_results_list")) {
-    result$combined_replicates <- combine_icers_results(result)
-  } else if (inherits(result, "cea_results")) {
-    result$combined_replicates <- combine_icers_results(result)
   }
 
   return(result)

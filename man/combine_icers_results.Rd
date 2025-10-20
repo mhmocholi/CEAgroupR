@@ -26,21 +26,5 @@ A tibble containing all bootstrap replicates with the following columns:
 Combines the bootstrap replicates contained in one or more objects of class
 \code{cea_results} or \code{cea_results_list} into a single tidy data frame. The resulting
 dataset includes all bootstrap samples for the overall analysis and any available
-subgroup analyses. This function is intended to facilitate plotting and comparison
-across different analyses or datasets.
-}
-\examples{
-data(cua_base)
-res <- icers_base(
-  data = cua_base,
-  group = "group",
-  cost = "cost_total",
-  effect = "effect",
-  R = 100,
-  lambda = 25000,
-  subgroup_vars = c("diabetes", "HTA")
-)
-df_combined <- combine_icers_results(res)
-head(df_combined)
-
+subgroup analyses.
 }

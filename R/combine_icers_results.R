@@ -3,8 +3,7 @@
 #' Combines the bootstrap replicates contained in one or more objects of class
 #' `cea_results` or `cea_results_list` into a single tidy data frame. The resulting
 #' dataset includes all bootstrap samples for the overall analysis and any available
-#' subgroup analyses. This function is intended to facilitate plotting and comparison
-#' across different analyses or datasets.
+#' subgroup analyses.
 #'
 #' @param ... One or more objects of class `cea_results` or a single object of class
 #'   `cea_results_list`, as returned by \code{\link{icers_base}}.
@@ -20,20 +19,6 @@
 #'         \code{Mean_Effect_g1}, \code{Mean_Effect_g2}, \code{NMB}.
 #' }
 #'
-#' @examples
-#' data(cua_base)
-#' res <- icers_base(
-#'   data = cua_base,
-#'   group = "group",
-#'   cost = "cost_total",
-#'   effect = "effect",
-#'   R = 100,
-#'   lambda = 25000,
-#'   subgroup_vars = c("diabetes", "HTA")
-#' )
-#' df_combined <- combine_icers_results(res)
-#' head(df_combined)
-#'
 #' @importFrom dplyr bind_rows mutate
 #' @importFrom tibble tibble
 #' @export
@@ -41,10 +26,7 @@ combine_icers_results <- function(...) {
 
   objects <- list(...)
   n_objs <- length(objects)
-
-  if (n_objs == 0) {
-    stop("At least one object must be provided.")
-  }
+  if (n_objs == 0) stop("At least one object must be provided.")
 
   # If a single object is a cea_results_list, unpack it
   if (n_objs == 1 && inherits(objects[[1]], "cea_results_list")) {
@@ -52,19 +34,21 @@ combine_icers_results <- function(...) {
     n_objs <- length(objects)
   }
 
-  # Validate class of each element
-  if (!all(sapply(objects, inherits, "cea_results"))) {
-    stop("All inputs must be of class 'cea_results'.")
-  }
+  # Remove any non-result elements such as $settings
+  objects <- Filter(function(x)
+    is.list(x) && ("Overall" %in% names(x) || "Subgroups" %in% names(x)),
+    objects)
+
+  if (length(objects) == 0)
+    stop("No valid 'cea_results' objects found for combination.")
 
   # Helper to extract bootstrap samples from one cea_results object
   extract_bootstrap <- function(res_obj, dataset_name) {
 
     extract_one <- function(x, level, subgroup = NA) {
-      if (!inherits(x, "cea_base")) return(NULL)
+      if (is.null(x$bootstrap_samples)) return(NULL)
       df <- x$bootstrap_samples
       if (is.null(df) || nrow(df) == 0) return(NULL)
-
       df$replicate <- seq_len(nrow(df))
       df$level <- level
       df$subgroup <- subgroup
