@@ -17,47 +17,47 @@ icers_base(
 }
 \arguments{
 \item{data}{A data frame or a named list of data frames containing all
-variables required for the analysis. All datasets in the list must share
-the same structure and variable names.}
+variables required for the analysis. All datasets must share the same structure.}
 
-\item{group}{A string indicating the column name that defines the two
-comparison groups (reference and intervention).}
+\item{group}{Character. Column name defining the comparison groups.}
 
-\item{cost}{A string indicating the column name for total cost.}
+\item{cost}{Character. Column name for total cost.}
 
-\item{effect}{A string indicating the column name for the measure of
-effectiveness (e.g., QALYs, life-years).}
+\item{effect}{Character. Column name for the effectiveness measure
+(e.g., QALYs, life-years).}
 
 \item{R}{Integer. Number of bootstrap replications (default = 1000).}
 
-\item{lambda}{Numeric. Willingness-to-pay threshold (default = 25000).}
+\item{lambda}{Numeric or numeric vector. Willingness-to-pay threshold(s)
+used to compute NMB. Defaults to 25000.}
 
 \item{ci_type}{Character. Type of confidence interval for \code{boot.ci}
 ("bca", "perc", "basic", "norm").}
 
 \item{subgroup_vars}{Optional character vector. Names of subgroup variables
-to stratify the analysis. These variables will be automatically converted
-to factors (if not already) to ensure consistent subgrouping.}
+to stratify the analysis.}
 }
 \value{
-If a single data frame is supplied, returns a list of class
-\code{cea_results} containing:
+A list of class \code{cea_results_list} containing:
 \itemize{
-\item \code{Overall}: A \code{cea_base} object with results for the full sample.
-\item \code{Subgroups}: A named list of subgroup-specific results.
-\item \code{combined_replicates}: A tibble combining all bootstrap samples.
-\item \code{settings}: A list with metadata (analysis parameters and reproducibility info).
+\item One element per dataset (each a \code{cea_results} list with
+Overall, Subgroups, and Summary).
+\item A single tibble \code{$combined_replicates} combining all bootstrap
+samples across datasets and subgroups.
+\item A global \code{$settings} list (lambda, R, seed, date, etc.).
 }
-
-If a list of data frames is supplied, returns a named list of
-\code{cea_results} objects (class \code{cea_results_list}) plus the element
-\code{combined_replicates} and \code{settings}.
 }
 \description{
 Performs nonparametric bootstrap resampling to estimate incremental cost,
 incremental effectiveness, ICER, and Net Monetary Benefit (NMB) between two
-comparison groups (e.g., usual care vs. intervention). The function also
-reports group-specific mean costs and effects, and optionally performs the
-analysis by predefined subgroups. It supports multiple datasets, allowing
-deterministic sensitivity analyses or scenario comparisons.
+comparison groups (e.g., usual care vs. intervention). The function supports
+multiple datasets (for scenario or sensitivity analyses) and optional subgroup
+analyses. It can also compute NMB for multiple willingness-to-pay thresholds
+(\code{lambda}) in a single run.
+}
+\details{
+The returned object is hierarchical: each dataset contains its own overall and
+subgroup analyses, while the root level stores the combined bootstrap replicates
+and metadata. The structure is designed for transparent, reproducible
+cost-effectiveness workflows.
 }

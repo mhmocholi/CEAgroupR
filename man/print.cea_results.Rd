@@ -7,14 +7,20 @@
 \method{print}{cea_results}(x, digits = 3, ...)
 }
 \arguments{
-\item{x}{An object of class \code{cea_results}.}
+\item{x}{An object of class \code{cea_results}, typically one element of the
+list returned by \code{\link{icers_base}}.}
 
-\item{digits}{Number of decimal places to display (default = 3).}
+\item{digits}{Integer. Number of decimal places to display (default = 3).}
 
 \item{...}{Additional arguments (currently unused).}
 }
+\value{
+Invisibly returns the input object \code{x} after printing its summary.
+}
 \description{
-Displays the main summary table of results directly when printing a
-\code{cea_results} object. It extracts means and 95\% confidence intervals
-from the stored bootstrap results for both the overall and subgroup analyses.
+Displays a summary table of bootstrap results when printing a
+\code{cea_results} object. Extracts mean estimates and 95\% confidence intervals
+from stored bootstrap results for both the overall and subgroup analyses.
+Automatically recognises multiple Net Monetary Benefit (NMB) parameters if
+several willingness-to-pay thresholds (\code{lambda}) were specified.
 }

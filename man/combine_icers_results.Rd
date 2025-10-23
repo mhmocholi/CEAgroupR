@@ -7,24 +7,26 @@
 combine_icers_results(...)
 }
 \arguments{
-\item{...}{One or more objects of class \code{cea_results} or a single object of class
-\code{cea_results_list}, as returned by \code{\link{icers_base}}.}
+\item{...}{One or more objects of class \code{cea_results}, or a single object of
+class \code{cea_results_list} as returned by \code{\link{icers_base}}.}
 }
 \value{
 A tibble containing all bootstrap replicates with the following columns:
 \itemize{
-\item \code{dataset}: dataset name (if multiple datasets were analysed).
-\item \code{level}: "Overall" or name of the subgroup variable.
+\item \code{dataset}: dataset name (if multiple datasets analysed).
+\item \code{level}: "Overall" or subgroup variable name.
 \item \code{subgroup}: subgroup level (if applicable).
 \item \code{replicate}: bootstrap replicate index.
 \item \code{Delta_Cost}, \code{Delta_Effect}, \code{ICER},
 \code{Mean_Cost_g1}, \code{Mean_Cost_g2},
-\code{Mean_Effect_g1}, \code{Mean_Effect_g2}, \code{NMB}.
+\code{Mean_Effect_g1}, \code{Mean_Effect_g2},
+and one or several \code{NMB_*} columns if multiple \code{lambda}
+values were specified.
 }
 }
 \description{
 Combines the bootstrap replicates contained in one or more objects of class
 \code{cea_results} or \code{cea_results_list} into a single tidy data frame. The resulting
-dataset includes all bootstrap samples for the overall analysis and any available
-subgroup analyses.
+tibble includes all bootstrap samples for the overall analysis and any subgroup
+analyses, across all datasets included in the call to \code{\link{icers_base}}.
 }

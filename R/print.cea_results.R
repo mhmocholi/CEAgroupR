@@ -1,28 +1,31 @@
 #' Print method for cea_results objects
 #'
-#' Displays the main summary table of results directly when printing a
-#' `cea_results` object. It extracts means and 95% confidence intervals
-#' from the stored bootstrap results for both the overall and subgroup analyses.
+#' Displays a summary table of bootstrap results when printing a
+#' \code{cea_results} object. Extracts mean estimates and 95% confidence intervals
+#' from stored bootstrap results for both the overall and subgroup analyses.
+#' Automatically recognises multiple Net Monetary Benefit (NMB) parameters if
+#' several willingness-to-pay thresholds (\code{lambda}) were specified.
 #'
-#' @param x An object of class `cea_results`.
-#' @param digits Number of decimal places to display (default = 3).
+#' @param x An object of class \code{cea_results}, typically one element of the
+#'   list returned by \code{\link{icers_base}}.
+#' @param digits Integer. Number of decimal places to display (default = 3).
 #' @param ... Additional arguments (currently unused).
+#'
+#' @return Invisibly returns the input object \code{x} after printing its summary.
+#' @importFrom tibble tibble
+#' @importFrom dplyr bind_rows
 #' @export
 print.cea_results <- function(x, digits = 3, ...) {
 
-  # ---- Helper: extract mean and CI from cea_base ----
+  # ---- Helper: extract mean and CI from a cea_base object ----
   summarize_from_object <- function(base_obj, level = "Overall", subgroup = "") {
     if (is.null(base_obj$bootstrap_samples)) return(NULL)
 
-    # Means
     means <- colMeans(base_obj$bootstrap_samples, na.rm = TRUE)
-
-    # Confidence intervals
     cis <- base_obj$boot_ci
     lower <- sapply(cis, function(ci) ci[1])
     upper <- sapply(cis, function(ci) ci[2])
 
-    # Build data frame
     tibble::tibble(
       Level = level,
       Subgroup = subgroup,
@@ -51,33 +54,40 @@ print.cea_results <- function(x, digits = 3, ...) {
     }
   }
 
-  # ---- Combine safely ----
+  # ---- Combine all results ----
   res_summary <- dplyr::bind_rows(res_all)
-
-  # ---- Header ----
-  cat("Cost-effectiveness analysis results\n")
-  cat("-----------------------------------\n")
-  cat("The table below shows mean estimates and 95% confidence intervals\n")
-  cat("for the overall sample and all available subgroups.\n\n")
-
-  # ---- Format numeric columns ----
-  num_cols <- sapply(res_summary, is.numeric)
-  if (any(num_cols)) {
-    res_summary[num_cols] <- lapply(
-      res_summary[num_cols],
-      function(col) format(round(col, digits), nsmall = digits, justify = "right")
-    )
+  if (nrow(res_summary) == 0) {
+    cat("No bootstrap summary data available.\n")
+    return(invisible(x))
   }
 
-  # ---- Format character columns ----
-  char_cols <- !num_cols
-  res_summary[char_cols] <- lapply(
-    res_summary[char_cols],
-    function(col) format(col, justify = "left")
-  )
+  # ---- Detect NMB columns dynamically ----
+  nmb_params <- grep("^NMB_", res_summary$Parameter, value = TRUE)
+  lambda_values <- unique(gsub("NMB_", "", nmb_params))
 
-  # ---- Print nicely ----
+  # ---- Header ----
+  cat("------------------------------------------------------------\n")
+  cat(" Cost-Effectiveness Analysis Results\n")
+  cat("------------------------------------------------------------\n")
+  if (length(lambda_values) > 0) {
+    cat("Willingness-to-pay thresholds (λ): ",
+        paste(lambda_values, collapse = ", "), "\n", sep = "")
+  } else {
+    cat("Willingness-to-pay threshold (λ): single value\n")
+  }
+  cat("Displayed values are bootstrap means and 95% confidence intervals.\n\n")
+
+  # ---- Format columns for printing ----
+  num_cols <- sapply(res_summary, is.numeric)
+  res_summary[num_cols] <- lapply(res_summary[num_cols], function(col)
+    format(round(col, digits), nsmall = digits, justify = "right"))
+  char_cols <- !num_cols
+  res_summary[char_cols] <- lapply(res_summary[char_cols], function(col)
+    format(col, justify = "left"))
+
+  # ---- Print formatted summary ----
   print.data.frame(res_summary, row.names = FALSE, right = TRUE)
   cat("\n")
+
   invisible(x)
 }

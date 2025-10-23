@@ -2,18 +2,23 @@
 % Please edit documentation in R/print.cea_base.R
 \name{print.cea_base}
 \alias{print.cea_base}
-\title{Print method for CEA base objects}
+\title{Print method for cea_base objects}
 \usage{
 \method{print}{cea_base}(x, digits = 3, ...)
 }
 \arguments{
 \item{x}{An object of class \code{cea_base}.}
 
-\item{digits}{Number of digits to display (default = 3).}
+\item{digits}{Integer. Number of decimal places to display (default = 3).}
 
-\item{...}{Additional arguments (ignored).}
+\item{...}{Additional arguments (currently unused).}
+}
+\value{
+Invisibly returns the input object \code{x} after printing its summary.
 }
 \description{
-Provides a compact and readable summary of bootstrap results
-(ICER, cost, effect, and NMB) using the simplified object structure.
+Displays the main bootstrap summary statistics for a single cost-effectiveness
+analysis comparing two strategies (reference vs. intervention). The function
+reports mean estimates and 95\% confidence intervals (95\% CI), together with
+the original point estimates and bootstrap bias for each parameter.
 }
