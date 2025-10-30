@@ -5,6 +5,10 @@
 #' reports mean estimates and 95% confidence intervals (95% CI), together with
 #' the original point estimates and bootstrap bias for each parameter.
 #'
+#' This print method is automatically applied to analytical outputs generated
+#' by \code{\link{compute_icers}} for each dataset or subgroup within a
+#' cost-effectiveness analysis.
+#'
 #' @param x An object of class \code{cea_base}.
 #' @param digits Integer. Number of decimal places to display (default = 3).
 #' @param ... Additional arguments (currently unused).

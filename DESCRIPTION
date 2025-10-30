@@ -23,7 +23,8 @@ Imports:
     magrittr,
     MASS,
     boot,
-    rlang
+    rlang,
+    colorspace
 Suggests: 
     knitr,
     rmarkdown,

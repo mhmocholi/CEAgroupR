@@ -19,7 +19,7 @@ Invisibly returns the input object \code{x}.
 \description{
 Nicely formats and prints the descriptive summary statistics created by
 \code{\link{summarize_cea_data}} and stored in the \code{$summary_stats}
-element of an object returned by \code{\link{icers_base}}.
+element of an object returned by \code{\link{compute_icers}}.
 }
 \details{
 Displays counts per group and subgroup, mean costs and effects, their standard

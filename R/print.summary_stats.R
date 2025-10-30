@@ -2,7 +2,7 @@
 #'
 #' Nicely formats and prints the descriptive summary statistics created by
 #' \code{\link{summarize_cea_data}} and stored in the \code{$summary_stats}
-#' element of an object returned by \code{\link{icers_base}}.
+#' element of an object returned by \code{\link{compute_icers}}.
 #'
 #' Displays counts per group and subgroup, mean costs and effects, their standard
 #' deviations (SD), and incremental results (ΔCost, ΔEffect, ICER, NMB) for each
@@ -24,8 +24,12 @@ print.summary_stats <- function(x, digits = 3, ...) {
   }
 
   df <- as.data.frame(x)
+  # Clean up missing subgroup levels for clarity
+  if ("subgroup_level" %in% names(df)) {
+    df$subgroup_level[is.na(df$subgroup_level)] <- ""
+  }
 
-  # Detect NMB columns dynamically
+  # ---- Detect NMB columns dynamically ----
   nmb_cols <- grep("^NMB_", names(df), value = TRUE)
   lambda_vals <- gsub("NMB_", "", nmb_cols)
 
@@ -39,13 +43,11 @@ print.summary_stats <- function(x, digits = 3, ...) {
   cat("\n")
 
   # ---- Calculate SD and 95% CI for mean variables if not already in the tibble ----
-  # (assuming summarize_cea_data() only had means)
   mean_cols <- grep("^mean_", names(df), value = TRUE)
   for (m in mean_cols) {
     sd_name <- sub("mean_", "sd_", m)
     if (!sd_name %in% names(df)) {
-      # Estimación rápida de SD por grupo-subgrupo si no existe (approx.)
-      # Placeholder: fill with NA if unavailable (avoid error)
+      # Fill missing SDs with NA (if summarize_cea_data did not include them)
       df[[sd_name]] <- NA
     }
   }
