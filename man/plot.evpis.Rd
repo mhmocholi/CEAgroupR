@@ -5,44 +5,51 @@
 \title{Plot Expected Value of Perfect Information (EVPI)}
 \usage{
 \method{plot}{evpis}(
-  object,
-  color_by = "dataset",
-  shape_by = "none",
-  facet_by = "none",
+  data,
+  color_by = NULL,
+  shape_by = NULL,
+  facet_by = NULL,
+  mode = "Overall",
   facet_scales = "fixed",
   lambda_max = NULL,
   lambda_steps = 100,
-  palette = "Set2"
+  palette = "Set2",
+  return_data = FALSE,
+  ...
 )
 }
 \arguments{
-\item{object}{A \code{cea_results_list} or tibble returned by
-\code{\link{combine_icers_results}}.}
+\item{data}{A \code{cea_results_list} object from \code{compute_icers()} or a tibble
+returned by \code{combine_icers_results()}.}
 
 \item{color_by, shape_by, facet_by}{Mapping options
-("dataset", "subgroup_var", "subgroup_level", "both", or "none").}
+("dataset", "subgroup_var", "subgroup_level", "both", or "none").
+If not specified, defaults are assigned automatically according to \code{mode}.}
+
+\item{mode}{Character. Determines which part of the data to display:
+"Full" (Overall + Subgroups), "Overall" (only overall results),
+or "Subgroups" (only subgroup-specific results). Default = "Overall".}
 
 \item{facet_scales}{Character. Facet scaling ("fixed", "free", etc.).}
 
 \item{lambda_max}{Numeric. Maximum λ value shown on the x-axis. If NULL,
 estimated automatically from ΔCost and ΔEffect.}
 
-\item{lambda_steps}{Integer. Number of λ values used to build the curves
-(default = 100; higher = smoother curves).}
+\item{lambda_steps}{Integer. Number of λ values (default = 100).}
 
-\item{palette}{Character. Color palette name for ggplot2 (default = "Set2").}
+\item{palette}{Character. Color palette name (default = "Set2").}
+
+\item{return_data}{Logical. If TRUE, returns the computed EVPI table.}
+
+\item{...}{Additional aesthetics (linewidth, alpha, etc.).}
 }
 \value{
-A ggplot object representing the EVPI curves.
+A ggplot object (default) or tibble if \code{return_data = TRUE}.
 }
 \description{
 Computes and plots the Expected Value of Perfect Information (EVPI)
-as a function of willingness-to-pay (λ) using bootstrap replicates from one or
-several analyses. When the bootstrap replicates represent incremental
-differences between two strategies (ΔCost, ΔEffect), the EVPI is computed as
-the expected gain from perfect information regarding the adoption decision.
-}
-\details{
-The graphical structure, argument order, and aesthetics are identical to
-\code{\link{plot.ceac}} and \code{\link{plot.icers}}.
+as a function of willingness-to-pay (λ) using bootstrap replicates.
+Fully compatible with the visualization layout of \code{plot.icers()} and
+\code{plot.ceacs()}, including visualization modes ("Overall", "Subgroups", "Full")
+and automatic mapping of color, shape, and facet aesthetics.
 }

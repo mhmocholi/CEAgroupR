@@ -2,13 +2,18 @@
 #'
 #' Computes and plots the probability of cost-effectiveness as a function of
 #' willingness-to-pay (λ) using bootstrap replicates from one or several analyses.
-#' The structure of grouping, coloring, and faceting is consistent with
-#' \code{\link{plot.icers}}.
+#' Fully compatible with the visualization layout of \code{plot.icers()}, including
+#' visualization modes ("Overall", "Subgroups", "Full") and automatic mapping of
+#' color, shape, and facet aesthetics.
 #'
-#' @param data A \code{cea_results_list} or tibble returned by
-#'   \code{\link{combine_icers_results}}.
+#' @param data A \code{cea_results_list} object returned by \code{\link{compute_icers}}
+#'   or a tibble returned by \code{\link{combine_icers_results}}.
 #' @param color_by,shape_by,facet_by Mapping options
 #'   ("dataset", "subgroup_var", "subgroup_level", "both", or "none").
+#'   If not specified, defaults are assigned automatically according to \code{mode}.
+#' @param mode Character. Determines which part of the data to display:
+#'   "Full" (Overall + Subgroups), "Overall" (only overall results),
+#'   or "Subgroups" (only subgroup-specific results). Default = "Overall".
 #' @param facet_scales Character. Facet scaling ("fixed", "free", etc.).
 #' @param lambda_max Numeric. Maximum λ value shown on the x-axis.
 #'   If NULL, estimated automatically from ΔCost and ΔEffect.
@@ -18,13 +23,13 @@
 #' @param return_data Logical. If TRUE, returns the CEAC dataframe instead of a ggplot.
 #' @param ... Additional arguments passed to ggplot2 layers (e.g., linewidth, alpha).
 #'
-#' @importFrom colorspace darken
 #' @return A ggplot object (default) or a tibble if `return_data = TRUE`.
 #' @export
 plot.ceacs <- function(data,
-                       color_by = "dataset",
-                       shape_by = "none",
-                       facet_by = "none",
+                       color_by = NULL,
+                       shape_by = NULL,
+                       facet_by = NULL,
+                       mode = "Overall",
                        facet_scales = "fixed",
                        lambda_max = NULL,
                        lambda_steps = 100,
@@ -32,30 +37,95 @@ plot.ceacs <- function(data,
                        return_data = FALSE,
                        ...) {
 
-  # ---- 1. Prepare input ----
+  # ---- 1. Detect input type and extract combined data ----
   if (inherits(data, "cea_results_list")) {
-    if (is.null(data$combined_replicates))
+    if (is.null(data$combined_replicates)) {
       stop("The object has no 'combined_replicates' element. Run compute_icers() first.")
+    }
     df <- data$combined_replicates
   } else if (inherits(data, "data.frame")) {
     df <- data
   } else {
-    stop("Invalid input: must be a cea_results_list or a combined tibble.")
+    stop("Invalid input: must be a 'cea_results_list' or a tibble of combined replicates.")
   }
 
-  # ---- 2. Estimate λ range ----
+  # ---- 2. Ensure group_uid and filter by mode ----
+  df$group_uid <- with(df, paste0(dataset, "_", subgroup_var, "_", subgroup_level))
+
+  # ---- Visualization mode filter ----
+  valid_modes <- c("Full", "Overall", "Subgroups")
+  mode <- match.arg(mode, valid_modes)
+
+  subgroup_mapped <- any(c(color_by, shape_by, facet_by) %in% c("subgroup_var", "subgroup_level"))
+  if (mode == "Overall" && subgroup_mapped) {
+    mode <- "Subgroups"
+    message("Mode automatically set to 'Subgroups' based on mapping aesthetics.")
+  }
+
+  if (mode == "Overall") {
+    df <- df[df$subgroup_var == "Overall" | is.na(df$subgroup_var), , drop = FALSE]
+  } else if (mode == "Subgroups") {
+    df <- df[df$subgroup_var != "Overall" & !is.na(df$subgroup_var), , drop = FALSE]
+  }
+
+  # Recreate group_uid after filtering
+  df$group_uid <- with(df, paste0(dataset, "_", subgroup_var, "_", subgroup_level))
+
+
+  # ---- 3. Determine visualization mode ----
+  valid_modes <- c("Full", "Overall", "Subgroups")
+  mode <- match.arg(mode, valid_modes)
+
+  subgroup_mapped <- any(c(color_by, shape_by, facet_by) %in% c("subgroup_var", "subgroup_level"))
+  if (mode == "Overall" && subgroup_mapped) {
+    mode <- "Subgroups"
+    message("Mode automatically set to 'Subgroups' based on mapping aesthetics.")
+  }
+
+  if (mode == "Overall") {
+    df <- df[df$subgroup_var == "Overall" | is.na(df$subgroup_var), , drop = FALSE]
+  } else if (mode == "Subgroups") {
+    df <- df[df$subgroup_var != "Overall" & !is.na(df$subgroup_var), , drop = FALSE]
+  }
+
+  # ---- 4. Auto-assign aesthetic defaults by mode ----
+  if (is.null(color_by) || color_by %in% c("none", "")) {
+    color_by <- switch(mode,
+                       "Overall" = "dataset",
+                       "Subgroups" = "subgroup_level",
+                       "Full" = "subgroup_level"
+    )
+  }
+
+  if (is.null(shape_by) || shape_by %in% c("none", "")) {
+    shape_by <- switch(mode,
+                       "Overall" = "none",
+                       "Subgroups" = "dataset",
+                       "Full" = "dataset"
+    )
+  }
+
+  if (is.null(facet_by) || facet_by %in% c("none", "")) {
+    facet_by <- switch(mode,
+                       "Overall" = "none",
+                       "Subgroups" = "subgroup_var",
+                       "Full" = "subgroup_var"
+    )
+  }
+
+  # ---- 5. Estimate λ range ----
   if (is.null(lambda_max)) {
     ratio <- with(df, Delta_Cost / Delta_Effect)
-    lambda_max <- max(0, quantile(ratio, probs = 0.9, na.rm = TRUE))
+    ratio <- ratio[is.finite(ratio)]
+    lambda_max <- max(0, quantile(abs(ratio), probs = 0.9, na.rm = TRUE))
     if (!is.finite(lambda_max) || lambda_max <= 0) lambda_max <- 100000
   }
-
   lambda_seq <- seq(0, lambda_max, length.out = lambda_steps)
 
-  # ---- 3. Compute CEAC empirically from bootstrap replicates ----
+  # ---- 6. Compute CEAC empirically ----
   compute_ceac <- function(df) {
-    probs <- numeric(length(lambda_seq))
     n <- nrow(df)
+    probs <- numeric(length(lambda_seq))
     for (i in seq_along(lambda_seq)) {
       l <- lambda_seq[i]
       probs[i] <- sum(df$Delta_Cost < l * df$Delta_Effect, na.rm = TRUE) / n
@@ -63,69 +133,61 @@ plot.ceacs <- function(data,
     tibble::tibble(lambda = lambda_seq, prob = cummax(probs))
   }
 
-  group_vars <- intersect(c("dataset", "subgroup_var", "subgroup_level"), names(df))
-
   ceac_df <- df %>%
-    dplyr::group_by(dplyr::across(all_of(group_vars))) %>%
+    dplyr::group_by(group_uid) %>%
     dplyr::group_modify(~ compute_ceac(.x)) %>%
-    dplyr::ungroup()
+    dplyr::ungroup() %>%
+    dplyr::left_join(
+      df %>%
+        dplyr::select(group_uid, dataset, subgroup_var, subgroup_level) %>%
+        dplyr::distinct(),
+      by = "group_uid"
+    )
 
-  # ---- Optional: Return the CEAC data for exploration ----
-  if (return_data) {
-    return(ceac_df)
-  }
+  # ---- 7. Return data option ----
+  if (return_data) return(ceac_df)
 
-  # ---- 4. Define darkened colors for emphasis ----
-  gg_pal <- suppressWarnings(
-    ggplot2::scale_color_brewer(palette = palette)$palette(length(unique(df[[color_by]])))
+  # ---- 8. Build layout using ce_plot_base ----
+  base <- ce_plot_base(
+    data = ceac_df,
+    color_by = color_by,
+    shape_by = shape_by,
+    facet_by = facet_by,
+    facet_scales = facet_scales,
+    palette = palette
   )
-  names(gg_pal) <- sort(unique(df[[color_by]]))
-  dark_map <- sapply(gg_pal, function(col) colorspace::darken(col, amount = 0.15))
 
-  # ---- 5. Build ggplot layout ----
-  color_var <- if (color_by %in% names(ceac_df)) color_by else "dataset"
+  p <- base$plot
+  color_var <- base$color_var
+  shape_var <- base$shape_var
+
+  # ---- 9. Define visual parameters ----
   user_args <- list(...)
-
-  linewidth_val <- if (!"linewidth" %in% names(user_args)) 1 else user_args$linewidth
+  line_width <- if (!"linewidth" %in% names(user_args)) 1 else user_args$linewidth
   alpha_val <- if (!"alpha" %in% names(user_args)) 1 else user_args$alpha
 
-  p <- ggplot2::ggplot(
-    ceac_df,
-    ggplot2::aes(
-      x = lambda, y = prob,
-      colour = .data[[color_var]],
-      group = .data[[color_var]]
-    )
-  ) +
-    ggplot2::geom_line(linewidth = linewidth_val, alpha = alpha_val, show.legend = TRUE) +
+  # ---- 10. Add CEAC curves ----
+  p <- p +
+    ggplot2::geom_line(
+      data = ceac_df,
+      mapping = ggplot2::aes(
+        x = lambda,
+        y = prob,
+        colour = .data[[color_var]],
+        group = .data$group_uid,
+        linetype = if (!is.null(shape_var)) .data[[shape_var]] else NULL
+      ),
+      linewidth = line_width,
+      alpha = alpha_val
+    ) +
     ggplot2::scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
-    ggplot2::scale_x_continuous(limits = c(0, lambda_max), expand = c(0, 0)) +
-    ggplot2::scale_color_brewer(palette = palette) +
     ggplot2::labs(
       title = "Cost-Effectiveness Acceptability Curve (CEAC)",
       x = expression(Willingness * "-to-" * Pay ~ (lambda)),
       y = "Probability cost-effective",
-      colour = color_by
-    ) +
-    ggplot2::theme_bw() +
-    ggplot2::theme(panel.grid.minor = ggplot2::element_blank())
-
-  # ---- 6. Add darkened overlay for visual emphasis (no legend) ----
-  for (grp in unique(ceac_df[[color_var]])) {
-    df_grp <- ceac_df[ceac_df[[color_var]] == grp, , drop = FALSE]
-    p <- p + ggplot2::geom_line(
-      data = df_grp,
-      ggplot2::aes(x = lambda, y = prob),
-      colour = dark_map[[grp]],
-      linewidth = linewidth_val * 1.1,
-      show.legend = FALSE
+      colour = color_by,
+      linetype = shape_by
     )
-  }
-
-  # ---- 7. Add facet structure if required ----
-  if (facet_by %in% names(ceac_df) && facet_by != "none") {
-    p <- p + ggplot2::facet_wrap(~ .data[[facet_by]], scales = facet_scales)
-  }
 
   return(p)
 }

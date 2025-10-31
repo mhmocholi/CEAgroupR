@@ -1,143 +1,172 @@
 #' Plot Expected Value of Perfect Information (EVPI)
 #'
 #' Computes and plots the Expected Value of Perfect Information (EVPI)
-#' as a function of willingness-to-pay (λ) using bootstrap replicates from one or
-#' several analyses. When the bootstrap replicates represent incremental
-#' differences between two strategies (ΔCost, ΔEffect), the EVPI is computed as
-#' the expected gain from perfect information regarding the adoption decision.
+#' as a function of willingness-to-pay (λ) using bootstrap replicates.
+#' Fully compatible with the visualization layout of \code{plot.icers()} and
+#' \code{plot.ceacs()}, including visualization modes ("Overall", "Subgroups", "Full")
+#' and automatic mapping of color, shape, and facet aesthetics.
 #'
-#' The graphical structure, argument order, and aesthetics are identical to
-#' \code{\link{plot.ceac}} and \code{\link{plot.icers}}.
-#'
-#' @param object A \code{cea_results_list} or tibble returned by
-#'   \code{\link{combine_icers_results}}.
+#' @param data A \code{cea_results_list} object from \code{compute_icers()} or a tibble
+#'   returned by \code{combine_icers_results()}.
 #' @param color_by,shape_by,facet_by Mapping options
 #'   ("dataset", "subgroup_var", "subgroup_level", "both", or "none").
+#'   If not specified, defaults are assigned automatically according to \code{mode}.
+#' @param mode Character. Determines which part of the data to display:
+#'   "Full" (Overall + Subgroups), "Overall" (only overall results),
+#'   or "Subgroups" (only subgroup-specific results). Default = "Overall".
 #' @param facet_scales Character. Facet scaling ("fixed", "free", etc.).
 #' @param lambda_max Numeric. Maximum λ value shown on the x-axis. If NULL,
 #'   estimated automatically from ΔCost and ΔEffect.
-#' @param lambda_steps Integer. Number of λ values used to build the curves
-#'   (default = 100; higher = smoother curves).
-#' @param palette Character. Color palette name for ggplot2 (default = "Set2").
+#' @param lambda_steps Integer. Number of λ values (default = 100).
+#' @param palette Character. Color palette name (default = "Set2").
+#' @param return_data Logical. If TRUE, returns the computed EVPI table.
+#' @param ... Additional aesthetics (linewidth, alpha, etc.).
 #'
-#' @return A ggplot object representing the EVPI curves.
+#' @return A ggplot object (default) or tibble if `return_data = TRUE`.
 #' @export
-plot.evpis <- function(object,
-                       color_by = "dataset",
-                       shape_by = "none",
-                       facet_by = "none",
+plot.evpis <- function(data,
+                       color_by = NULL,
+                       shape_by = NULL,
+                       facet_by = NULL,
+                       mode = "Overall",
                        facet_scales = "fixed",
                        lambda_max = NULL,
                        lambda_steps = 100,
-                       palette = "Set2") {
+                       palette = "Set2",
+                       return_data = FALSE,
+                       ...) {
 
-  # ---- 1. Prepare combined data ----
-  if (inherits(object, "cea_results_list")) {
-    if (is.null(object$combined_replicates))
+  # ---- 1. Extract or validate input ----
+  if (inherits(data, "cea_results_list")) {
+    if (is.null(data$combined_replicates))
       stop("The object has no 'combined_replicates' element. Run compute_icers() first.")
-    df <- object$combined_replicates
-  } else if (inherits(object, "data.frame")) {
-    df <- object
+    df <- data$combined_replicates
+  } else if (inherits(data, "data.frame")) {
+    df <- data
   } else {
-    stop("Invalid input: must be a cea_results_list or a combined tibble.")
+    stop("Invalid input: must be a 'cea_results_list' or combined tibble.")
   }
 
-  # Add subgroup columns if missing
-  if (!"subgroup_var" %in% names(df)) df$subgroup_var <- "Overall"
-  if (!"subgroup_level" %in% names(df)) df$subgroup_level <- "Overall"
+  # ---- 2. Ensure group_uid and apply mode filter ----
+  df$group_uid <- with(df, paste0(dataset, "_", subgroup_var, "_", subgroup_level))
 
-  # ---- 2. Estimate λ range ----
+  valid_modes <- c("Full", "Overall", "Subgroups")
+  mode <- match.arg(mode, valid_modes)
+
+  subgroup_mapped <- any(c(color_by, shape_by, facet_by) %in% c("subgroup_var", "subgroup_level"))
+  if (mode == "Overall" && subgroup_mapped) {
+    mode <- "Subgroups"
+    message("Mode automatically set to 'Subgroups' based on mapping aesthetics.")
+  }
+
+  if (mode == "Overall") {
+    df <- df[df$subgroup_var == "Overall" | is.na(df$subgroup_var), , drop = FALSE]
+  } else if (mode == "Subgroups") {
+    df <- df[df$subgroup_var != "Overall" & !is.na(df$subgroup_var), , drop = FALSE]
+  }
+
+  df$group_uid <- with(df, paste0(dataset, "_", subgroup_var, "_", subgroup_level))
+
+  # ---- 3. Auto-assign aesthetics by mode ----
+  if (is.null(color_by) || color_by %in% c("none", "")) {
+    color_by <- switch(mode,
+                       "Overall" = "dataset",
+                       "Subgroups" = "subgroup_level",
+                       "Full" = "subgroup_level"
+    )
+  }
+
+  if (is.null(shape_by) || shape_by %in% c("none", "")) {
+    shape_by <- switch(mode,
+                       "Overall" = "none",
+                       "Subgroups" = "dataset",
+                       "Full" = "dataset"
+    )
+  }
+
+  if (is.null(facet_by) || facet_by %in% c("none", "")) {
+    facet_by <- switch(mode,
+                       "Overall" = "none",
+                       "Subgroups" = "subgroup_var",
+                       "Full" = "subgroup_var"
+    )
+  }
+
+  # ---- 4. Estimate λ range ----
   if (is.null(lambda_max)) {
     ratio <- with(df, Delta_Cost / Delta_Effect)
-    lambda_max <- max(0, quantile(ratio, probs = 0.9, na.rm = TRUE))
+    ratio <- ratio[is.finite(ratio)]
+    lambda_max <- max(0, quantile(abs(ratio), probs = 0.9, na.rm = TRUE))
     if (!is.finite(lambda_max) || lambda_max <= 0) lambda_max <- 100000
   }
-
   lambda_seq <- seq(0, lambda_max, length.out = lambda_steps)
 
-  # ---- 3. Compute EVPI (incremental definition) ----
+  # ---- 5. Compute EVPI for each group ----
+  compute_evpi <- function(df) {
+    results <- lapply(lambda_seq, function(l) {
+      NMB <- l * df$Delta_Effect - df$Delta_Cost
+      perfect <- mean(pmax(0, NMB), na.rm = TRUE)
+      current <- max(0, mean(NMB, na.rm = TRUE))
+      tibble::tibble(lambda = l, EVPI = perfect - current)
+    })
+    dplyr::bind_rows(results)
+  }
+
   evpi_df <- df %>%
-    dplyr::group_by(dataset, subgroup_var, subgroup_level) %>%
-    dplyr::group_modify(~ {
-
-      message("---- Calculating EVPI ----")
-      message("Dataset: ", unique(.x$dataset))
-      message("Subgroup: ", unique(.x$subgroup_var), " = ", unique(.x$subgroup_level))
-
-      # Initialize a list to store intermediate results
-      results_list <- vector("list", length(lambda_seq))
-
-      for (i in seq_along(lambda_seq)) {
-        l <- lambda_seq[i]
-
-        NMB <- l * .x$Delta_Effect - .x$Delta_Cost
-
-        # Perfect information: expected value of the optimal choice
-        perfect_info <- mean(pmax(0, NMB), na.rm = TRUE)
-
-        # Current information: NMB using expected values
-        current_info <- max(0, mean(NMB, na.rm = TRUE))
-
-        EVPI_value <- perfect_info - current_info
-
-        # Store each iteration as a row tibble
-        results_list[[i]] <- tibble::tibble(
-          lambda = l,
-          EVPI = EVPI_value
-        )
-
-        # Print current step to console
-        message(
-          sprintf("λ = %-8.0f | EVPI = %.4f | mean(ΔE)=%.5f | mean(ΔC)=%.2f",
-                  l,
-                  EVPI_value,
-                  mean(.x$Delta_Effect, na.rm = TRUE),
-                  mean(.x$Delta_Cost, na.rm = TRUE))
-        )
-      }
-
-      # Combine all λ iterations into one tibble
-      dplyr::bind_rows(results_list) %>%
-        dplyr::mutate(
-          dataset = unique(.x$dataset),
-          subgroup_var = unique(.x$subgroup_var),
-          subgroup_level = unique(.x$subgroup_level)
-        )
-    }) %>%
-    dplyr::ungroup()
-
-
-  # ---- 4. Build ggplot (identical geometry style to plot.ceac) ----
-  color_var <- if (color_by %in% names(evpi_df)) color_by else "dataset"
-
-  p <- ggplot2::ggplot(
-    evpi_df,
-    ggplot2::aes(
-      x = lambda,
-      y = EVPI,
-      colour = .data[[color_var]],
-      group = .data[[color_var]]
+    dplyr::group_by(group_uid) %>%
+    dplyr::group_modify(~ compute_evpi(.x)) %>%
+    dplyr::ungroup() %>%
+    dplyr::left_join(
+      df %>%
+        dplyr::select(group_uid, dataset, subgroup_var, subgroup_level) %>%
+        dplyr::distinct(),
+      by = "group_uid"
     )
-  ) +
-    ggplot2::geom_line(linewidth = 1) +  # only simple lines
+
+  if (return_data) return(evpi_df)
+
+  # ---- 6. Build layout ----
+  base <- ce_plot_base(
+    data = evpi_df,
+    color_by = color_by,
+    shape_by = shape_by,
+    facet_by = facet_by,
+    facet_scales = facet_scales,
+    palette = palette
+  )
+
+  p <- base$plot
+  color_var <- base$color_var
+  shape_var <- base$shape_var
+
+  # ---- 7. Line aesthetics ----
+  user_args <- list(...)
+  lw <- if (!"linewidth" %in% names(user_args)) 1 else user_args$linewidth
+  alpha_val <- if (!"alpha" %in% names(user_args)) 1 else user_args$alpha
+
+  # ---- 8. Draw EVPI curves ----
+  p <- p +
+    ggplot2::geom_line(
+      data = evpi_df,
+      mapping = ggplot2::aes(
+        x = lambda,
+        y = EVPI,
+        colour = .data[[color_var]],
+        group = .data$group_uid,
+        linetype = if (!is.null(shape_var)) .data[[shape_var]] else NULL
+      ),
+      linewidth = lw,
+      alpha = alpha_val
+    ) +
     ggplot2::scale_y_continuous(expand = c(0, 0)) +
-    ggplot2::scale_x_continuous(limits = c(0, lambda_max), expand = c(0, 0)) +
-    ggplot2::scale_color_brewer(palette = palette) +
+    ggplot2::scale_x_continuous(expand = c(0, 0)) +
     ggplot2::labs(
       title = "Expected Value of Perfect Information (EVPI)",
       x = expression(Willingness * "-to-" * Pay ~ (lambda)),
       y = "EVPI (Monetary units)",
-      colour = "Dataset"
-    ) +
-    ggplot2::theme_bw() +
-    ggplot2::theme(
-      panel.grid.minor = ggplot2::element_blank(),
-      legend.position = "right"
+      colour = color_by,
+      linetype = shape_by
     )
-
-  if (facet_by %in% names(evpi_df) && facet_by != "none") {
-    p <- p + ggplot2::facet_wrap(~ .data[[facet_by]], scales = facet_scales)
-  }
 
   return(p)
 }

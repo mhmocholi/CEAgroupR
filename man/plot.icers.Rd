@@ -6,9 +6,10 @@
 \usage{
 \method{plot}{icers}(
   data,
-  color_by = "dataset",
-  shape_by = "none",
-  facet_by = "none",
+  color_by = NULL,
+  shape_by = NULL,
+  facet_by = NULL,
+  mode = "Overall",
   show_points = TRUE,
   show_means = TRUE,
   show_contours = FALSE,
@@ -21,24 +22,25 @@
 )
 }
 \arguments{
-\item{data}{A \code{cea_results_list} or tibble returned by
+\item{data}{A \code{cea_results_list} object returned by
+\code{\link{compute_icers}} or a tibble returned by
 \code{\link{combine_icers_results}}.}
 
-\item{color_by, shape_by, facet_by}{Mapping options
-("dataset", "subgroup_var", "subgroup_level", "both", or "none").}
+\item{color_by, shape_by, facet_by}{Mapping options:
+"dataset", "subgroup_var", "subgroup_level", "both", or "none".
+If not provided, defaults are assigned automatically based on \code{mode}.}
 
-\item{show_points}{Logical. If TRUE, display individual bootstrap replicates.}
+\item{mode}{Character. Determines which part of the data to display:
+"Full" (Overall + Subgroups), "Overall" (only overall results),
+or "Subgroups" (only subgroup-specific results). Default = "Overall".}
 
-\item{show_means}{Logical. If TRUE, display mean incremental values per group.}
+\item{show_points, show_means, show_contours, show_lambdas}{Logical flags
+controlling display of bootstrap samples, mean points, contour layers,
+and willingness-to-pay (λ) reference lines.}
 
-\item{show_contours}{Logical. If TRUE, add distribution contours.}
+\item{contour_type}{Character. Either "non_parametric" or "ellipse".}
 
-\item{contour_type}{Character. Either "non_parametric" (default) or "ellipse".}
-
-\item{contour_level}{Numeric vector. Probability levels for contour display
-(default = 0.95).}
-
-\item{show_lambdas}{Logical. If TRUE, add λ reference lines.}
+\item{contour_level}{Numeric vector. Probability levels for contour display.}
 
 \item{facet_scales}{Character. Facet scaling ("fixed", "free", etc.).}
 
@@ -51,13 +53,8 @@ A ggplot object representing the cost-effectiveness plane.
 }
 \description{
 Generates a cost-effectiveness (CE) plane displaying incremental costs
-and effects obtained from bootstrap replications. Supports flexible
-organization by dataset, subgroup variable, and subgroup level.
-Optional elements include mean points, willingness-to-pay (λ) reference
-lines, and either non-parametric or elliptical contour overlays.
-}
-\details{
-The layout and argument structure are consistent across all visualization
-functions in the package. Additional ggplot2 arguments can be passed through
-the ellipsis (...) for fine control over graphical aesthetics.
+and effects obtained from bootstrap replications. Fully compatible with
+dataset, subgroup variable, and subgroup level mapping. Includes an explicit
+visualization mode selector controlling whether to display overall, subgroup,
+or full results, with automatic aesthetic defaults by mode.
 }
