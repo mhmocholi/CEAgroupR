@@ -5,10 +5,6 @@
 #' reports mean estimates and 95% confidence intervals (95% CI), together with
 #' the original point estimates and bootstrap bias for each parameter.
 #'
-#' This print method is automatically applied to analytical outputs generated
-#' by \code{\link{compute_icers}} for each dataset or subgroup within a
-#' cost-effectiveness analysis.
-#'
 #' @param x An object of class \code{cea_base}.
 #' @param digits Integer. Number of decimal places to display (default = 3).
 #' @param ... Additional arguments (currently unused).
@@ -23,14 +19,12 @@ print.cea_base <- function(x, digits = 3, ...) {
     return(invisible(x))
   }
 
-  # ---- Extract means, CIs, originals and bias ----
   means  <- colMeans(x$bootstrap_samples, na.rm = TRUE)
   lower  <- sapply(x$boot_ci, function(ci) ci[1])
   upper  <- sapply(x$boot_ci, function(ci) ci[2])
   orig   <- if (!is.null(x$t0))  x$t0  else rep(NA, length(means))
   bias   <- if (!is.null(x$bias)) x$bias else rep(NA, length(means))
 
-  # ---- Build summary table ----
   summary_df <- tibble::tibble(
     Parameter = names(means),
     Original  = round(orig,  digits),
@@ -40,29 +34,26 @@ print.cea_base <- function(x, digits = 3, ...) {
     Upper_95  = round(upper, digits)
   )
 
-  # ---- Detect lambda values ----
   nmb_params <- grep("^NMB_", names(means), value = TRUE)
   lambda_values <- gsub("NMB_", "", nmb_params)
 
-  # ---- Header ----
   cat("------------------------------------------------------------\n")
   cat(" Cost-Effectiveness Analysis (Bootstrap Summary)\n")
   cat("------------------------------------------------------------\n")
   if (length(lambda_values) > 0) {
     cat("Willingness-to-pay thresholds (λ): ",
         paste(lambda_values, collapse = ", "), "\n", sep = "")
-  } else {
-    cat("Willingness-to-pay threshold (λ): single value\n")
   }
   cat("\nDisplayed values: Original estimates, bootstrap means and 95% CIs.\n\n")
 
-  # ---- Format numeric columns for console ----
   num_cols <- sapply(summary_df, is.numeric)
   summary_df[num_cols] <- lapply(summary_df[num_cols], function(col)
-    format(round(col, digits), nsmall = digits, justify = "right"))
+    format(round(col, digits),
+           nsmall = digits,
+           justify = "right",
+           scientific = FALSE))
   summary_df$Parameter <- format(summary_df$Parameter, justify = "left")
 
-  # ---- Print formatted table ----
   print.data.frame(summary_df, row.names = FALSE, right = TRUE)
   cat("\n")
 

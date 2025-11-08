@@ -31,7 +31,7 @@ ce_plot_base <- function(data,
 
   # ---- 3. Handle conflict 'both' + 'both' and legend preparation ----
   if (identical(color_by, "both") && identical(facet_by, "both")) {
-    message("⚠️ Simplifying mapping: when both color_by and facet_by = 'both', ",
+    message("Simplifying mapping: when both color_by and facet_by = 'both', ",
             "color_by is internally set to 'subgroup_level' for clarity.")
     color_by <- "subgroup_level"
   }

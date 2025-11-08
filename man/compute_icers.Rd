@@ -12,7 +12,10 @@ compute_icers(
   R = 1000,
   lambda = 25000,
   ci_type = "bca",
-  subgroup_vars = NULL
+  subgroup_vars = NULL,
+  seed = NULL,
+  verbose = FALSE,
+  ref_group = NULL
 )
 }
 \arguments{
@@ -31,6 +34,15 @@ compute_icers(
 \item{ci_type}{Character. Type of confidence interval ("bca", "perc", etc.).}
 
 \item{subgroup_vars}{Character vector of subgrouping variables.}
+
+\item{seed}{Optional integer to control reproducibility. If NULL, a random
+seed is generated and stored in the settings list.}
+
+\item{verbose}{Logical. If TRUE, progress messages and bars are displayed.
+Defaults to FALSE for CRAN-friendly silent execution.}
+
+\item{ref_group}{Character. Specifies the reference (control) group level.
+If NULL, the first factor level is used by default.}
 }
 \value{
 A list of class \code{cea_results_list}.

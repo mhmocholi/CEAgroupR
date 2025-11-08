@@ -13,9 +13,10 @@
   show_points = TRUE,
   show_means = TRUE,
   show_contours = FALSE,
-  contour_type = "non_parametric",
-  contour_level = 0.95,
   show_lambdas = TRUE,
+  label_lambdas = FALSE,
+  contour_type = "non_parametric",
+  contour_level = c(0.5, 0.75, 0.95),
   facet_scales = "fixed",
   palette = "Set2",
   ...
@@ -34,27 +35,36 @@ If not provided, defaults are assigned automatically based on \code{mode}.}
 "Full" (Overall + Subgroups), "Overall" (only overall results),
 or "Subgroups" (only subgroup-specific results). Default = "Overall".}
 
-\item{show_points, show_means, show_contours, show_lambdas}{Logical flags
-controlling display of bootstrap samples, mean points, contour layers,
-and willingness-to-pay (λ) reference lines.}
+\item{show_points}{Logical. If TRUE, displays individual bootstrap samples.}
 
-\item{contour_type}{Character. Either "non_parametric" or "ellipse".}
+\item{show_means}{Logical. If TRUE, displays mean ICER points for each group.}
 
-\item{contour_level}{Numeric vector. Probability levels for contour display.}
+\item{show_contours}{Logical. If TRUE, adds probability contour layers.}
 
-\item{facet_scales}{Character. Facet scaling ("fixed", "free", etc.).}
+\item{show_lambdas}{Logical. If TRUE, draws willingness-to-pay (λ) lines.}
+
+\item{label_lambdas}{Logical. If TRUE, labels λ reference lines horizontally.}
+
+\item{contour_type}{Character. Either "non_parametric" (kernel density)
+or "ellipse" (covariance ellipse). Default = "non_parametric".}
+
+\item{contour_level}{Numeric vector. Probability levels for contour display.
+Default = c(0.5, 0.75, 0.95).}
+
+\item{facet_scales}{Character. Facet scaling option ("fixed", "free", etc.).}
 
 \item{palette}{Character. Color palette name for ggplot2 (default = "Set2").}
 
-\item{...}{Additional arguments passed to ggplot2 layers (e.g., size, alpha).}
+\item{...}{Additional graphical arguments passed to ggplot2 layers
+(for example, size, alpha).}
 }
 \value{
-A ggplot object representing the cost-effectiveness plane.
+A ggplot object representing the incremental cost-effectiveness plane.
 }
 \description{
-Generates a cost-effectiveness (CE) plane displaying incremental costs
-and effects obtained from bootstrap replications. Fully compatible with
-dataset, subgroup variable, and subgroup level mapping. Includes an explicit
-visualization mode selector controlling whether to display overall, subgroup,
-or full results, with automatic aesthetic defaults by mode.
+Generates an incremental cost-effectiveness (CE) plane displaying incremental
+costs and effects obtained from bootstrap replications. The function is fully
+compatible with datasets, subgroup variables, and subgroup levels. It allows
+optional display of bootstrap points, mean points, probability contours,
+and willingness-to-pay (λ) reference lines.
 }

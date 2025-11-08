@@ -14,15 +14,25 @@
 #' @param lambda Numeric vector. Willingness-to-pay thresholds.
 #' @param ci_type Character. Type of confidence interval ("bca", "perc", etc.).
 #' @param subgroup_vars Character vector of subgrouping variables.
+#' @param seed Optional integer to control reproducibility. If NULL, a random
+#'   seed is generated and stored in the settings list.
+#' @param verbose Logical. If TRUE, progress messages and bars are displayed.
+#'   Defaults to FALSE for CRAN-friendly silent execution.
+#' @param ref_group Character. Specifies the reference (control) group level.
+#'   If NULL, the first factor level is used by default.
+#'
 #' @return A list of class \code{cea_results_list}.
 #' @export
 compute_icers <- function(data, group, cost, effect,
                           R = 1000, lambda = 25000,
-                          ci_type = "bca", subgroup_vars = NULL) {
+                          ci_type = "bca", subgroup_vars = NULL,
+                          seed = NULL, verbose = FALSE, ref_group = NULL) {
 
   # ---- 1. Initialize reproducible seed ----
-  global_seed <- 1902
-  set.seed(global_seed)
+  if (is.null(seed)) {
+    seed <- as.integer(Sys.time()) %% 1e6
+  }
+  set.seed(seed)
 
   # ---- 2. Validate input ----
   if (is.data.frame(data)) {
@@ -30,7 +40,7 @@ compute_icers <- function(data, group, cost, effect,
   } else if (is.list(data)) {
     colnames_ref <- names(data[[1]])
     inconsistent <- any(sapply(data[-1], function(df) !identical(names(df), colnames_ref)))
-    if (inconsistent) stop("All datasets must have identical structure.")
+    if (inconsistent) warning("Datasets do not share identical column names.")
     if (is.null(names(data)) || any(names(data) == "")) {
       dataset_names <- paste0("dataset_", seq_along(data))
       names(data) <- dataset_names
@@ -61,7 +71,7 @@ compute_icers <- function(data, group, cost, effect,
 
   # ---- 4. Safe CI extraction ----
   safe_ci <- function(boot_obj, index, pb_ci) {
-    setTxtProgressBar(pb_ci, index)
+    if (verbose) setTxtProgressBar(pb_ci, index)
     ci_obj <- tryCatch(
       boot::boot.ci(boot_obj, type = ci_type, index = index),
       error = function(e) NULL
@@ -73,29 +83,45 @@ compute_icers <- function(data, group, cost, effect,
     c(NA, NA)
   }
 
-  # ---- 5. Analysis for one dataset (stable tracking version) ----
+  # ---- 5. Analysis for one dataset ----
   analyze_data <- function(df, dataset_name = NULL, subgroup_info = NULL) {
     df[[group]] <- as.factor(df[[group]])
 
-    # Context message
-    context <- if (is.null(subgroup_info)) {
-      paste0("[Dataset: ", dataset_name, "] [Overall]")
-    } else {
-      paste0("[Dataset: ", dataset_name, "] [Subgroup: ",
-             subgroup_info$var, " = ", subgroup_info$level, "]")
+    # Set reference group if specified
+    if (!is.null(ref_group)) {
+      if (!ref_group %in% levels(df[[group]])) {
+        stop("The specified ref_group '", ref_group, "' is not found in the group variable.")
+      }
+      df[[group]] <- stats::relevel(df[[group]], ref = ref_group)
     }
-    message(context)
-    message("Bootstrap analysis started (", nrow(df), " observations, R = ", R, ")")
+
+    # Context message
+    if (verbose) {
+      context <- if (is.null(subgroup_info)) {
+        paste0("[Dataset: ", dataset_name, "] [Overall]")
+      } else {
+        paste0("[Dataset: ", dataset_name, "] [Subgroup: ",
+               subgroup_info$var, " = ", subgroup_info$level, "]")
+      }
+      message(context)
+      message("Bootstrap analysis started (", nrow(df), " observations, R = ", R, ")")
+    }
+
+    # Check sufficient group levels
+    if (length(unique(df[[group]])) < 2) {
+      warning("Dataset '", dataset_name, "' does not contain two comparison groups. Skipping analysis.")
+      return(NULL)
+    }
 
     # Progress bar for bootstrap
-    pb <- txtProgressBar(min = 0, max = R, style = 3)
-    progress_counter <- 0
+    pb <- if (verbose) txtProgressBar(min = 0, max = R, style = 3)
 
+    progress_counter <- 0
     boot_res <- boot::boot(
       data = df,
       statistic = function(d, i) {
         progress_counter <<- progress_counter + 1
-        if (progress_counter %% (R / 20) == 0 || progress_counter == R) {
+        if (verbose && (progress_counter %% (R / 20) == 0 || progress_counter == R)) {
           setTxtProgressBar(pb, progress_counter)
         }
         ratio_fun(d, i,
@@ -107,10 +133,14 @@ compute_icers <- function(data, group, cost, effect,
       R = R,
       strata = as.numeric(df[[group]])
     )
-    close(pb)
+    if (verbose) close(pb)
 
-    message("Computing confidence intervals...")
-    pb_ci <- txtProgressBar(min = 0, max = ncol(boot_res$t), style = 3)
+    if (verbose) {
+      message("Computing confidence intervals...")
+      pb_ci <- txtProgressBar(min = 0, max = ncol(boot_res$t), style = 3)
+    } else {
+      pb_ci <- NULL
+    }
 
     base_names <- c(
       "Delta_Cost", "Delta_Effect", "ICER",
@@ -125,9 +155,7 @@ compute_icers <- function(data, group, cost, effect,
     ci_list <- setNames(lapply(seq_along(stat_names),
                                function(i) safe_ci(boot_res, i, pb_ci)),
                         stat_names)
-    close(pb_ci)
-
-    message("Confidence intervals computed successfully.\n")
+    if (verbose && !is.null(pb_ci)) close(pb_ci)
 
     bootstrap_df <- as.data.frame(boot_res$t)
     names(bootstrap_df) <- stat_names
@@ -146,19 +174,39 @@ compute_icers <- function(data, group, cost, effect,
     out
   }
 
-  # ---- 6. Wrapper for subgroups ----
+  # ---- 6. Wrapper for subgroups (robust version) ----
   analyze_with_subgroups <- function(df, dataset_name) {
+
     if (!is.null(subgroup_vars)) {
-      for (v in subgroup_vars) if (!is.factor(df[[v]])) df[[v]] <- as.factor(df[[v]])
+      subgroup_vars <- subgroup_vars[subgroup_vars != "" & subgroup_vars %in% names(df)]
+      if (length(subgroup_vars) == 0) {
+        warning("No valid subgroup variables found in dataset '", dataset_name, "'. Proceeding with overall analysis only.")
+        subgroup_vars <- NULL
+      }
+    }
+
+    if (!is.null(subgroup_vars)) {
+      for (v in subgroup_vars) {
+        if (!is.factor(df[[v]])) df[[v]] <- as.factor(df[[v]])
+      }
     }
 
     overall_result <- analyze_data(df, dataset_name = dataset_name)
     subgroup_results <- NULL
+
     if (!is.null(subgroup_vars)) {
       subgroup_results <- lapply(subgroup_vars, function(var) {
         sub_data <- df %>% dplyr::filter(!is.na(.data[[var]]))
+        if (nrow(sub_data) == 0) {
+          warning("Subgroup variable '", var, "' in dataset '", dataset_name, "' contains only NA values. Skipping.")
+          return(NULL)
+        }
         split_data <- split(sub_data, sub_data[[var]])
         split_data <- Filter(function(x) length(unique(x[[group]])) == 2, split_data)
+        if (length(split_data) == 0) {
+          warning("No valid two-group sublevels found for variable '", var, "' in dataset '", dataset_name, "'.")
+          return(NULL)
+        }
         lapply(names(split_data), function(lvl) {
           analyze_data(split_data[[lvl]],
                        dataset_name = dataset_name,
@@ -167,6 +215,7 @@ compute_icers <- function(data, group, cost, effect,
       })
       names(subgroup_results) <- subgroup_vars
     }
+
     structure(list(Overall = overall_result, Subgroups = subgroup_results),
               class = "cea_results")
   }
@@ -181,7 +230,7 @@ compute_icers <- function(data, group, cost, effect,
   class(result) <- c("cea_results_list", "list")
 
   # ---- 8. Combine and summarize ----
-  message("Combining bootstrap replicates and computing summary statistics...")
+  if (verbose) message("Combining bootstrap replicates and computing summary statistics...")
   result$combined_replicates <- combine_icers_results(result)
   result$summary_stats <- summarize_cea_data(
     data = data,
@@ -200,12 +249,14 @@ compute_icers <- function(data, group, cost, effect,
     R = R,
     subgroup_vars = subgroup_vars,
     datasets = dataset_names,
-    seed = global_seed,
+    seed = seed,
+    ref_group = ref_group,
+    verbose = verbose,
     date = Sys.time(),
     ci_type = ci_type
   )
   result$settings <- settings
 
-  message("Analysis completed successfully.")
+  if (verbose) message("Analysis completed successfully.")
   return(result)
 }

@@ -22,8 +22,3 @@ analysis comparing two strategies (reference vs. intervention). The function
 reports mean estimates and 95\% confidence intervals (95\% CI), together with
 the original point estimates and bootstrap bias for each parameter.
 }
-\details{
-This print method is automatically applied to analytical outputs generated
-by \code{\link{compute_icers}} for each dataset or subgroup within a
-cost-effectiveness analysis.
-}

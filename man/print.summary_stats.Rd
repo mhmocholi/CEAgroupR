@@ -17,14 +17,8 @@
 Invisibly returns the input object \code{x}.
 }
 \description{
-Nicely formats and prints the descriptive summary statistics created by
-\code{\link{summarize_cea_data}} and stored in the \code{$summary_stats}
-element of an object returned by \code{\link{compute_icers}}.
-}
-\details{
-Displays counts per group and subgroup, mean costs and effects, their standard
-deviations (SD), and incremental results (ΔCost, ΔEffect, ICER, NMB) for each
-dataset and subgroup combination. The dataset column is hidden in the printed
-output (since it is already indicated in the section header) but remains in
-the underlying tibble for programmatic access.
+Formats and prints descriptive summaries produced by
+\code{\link{summarize_cea_data}}. Compatible with the output of
+\code{\link{compute_icers}}, displaying also stored analysis settings
+if available.
 }

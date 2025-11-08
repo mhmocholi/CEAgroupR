@@ -16,16 +16,16 @@
 #'
 #' @return A ggplot object.
 #' @export
-plot.distribution <- function(data,
-                              variable = "cost",
-                              geom_type = "histogram",
-                              color_by = NULL,
-                              shape_by = NULL,
-                              facet_by = NULL,
-                              mode = "Overall",
-                              facet_scales = "fixed",
-                              palette = "Set2",
-                              ...) {
+plot.marginals <- function(data,
+                           variable = "cost",
+                           geom_type = "histogram",
+                           color_by = NULL,
+                           shape_by = NULL,
+                           facet_by = NULL,
+                           mode = "Overall",
+                           facet_scales = "fixed",
+                           palette = "Set2",
+                           ...) {
 
   # ---- 1. Validate and extract combined data ----
   if (inherits(data, "cea_results_list")) {
@@ -261,11 +261,6 @@ plot.distribution <- function(data,
   } else if (mode != "Subgroups" && !is.null(list(...)$compare) && list(...)$compare == TRUE) {
     message("Statistical comparison lines are only available in mode = 'Subgroups'.")
   }
-
-
-
-
-
 
   return(p)
 }

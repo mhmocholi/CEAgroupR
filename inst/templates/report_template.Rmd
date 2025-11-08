@@ -1,0 +1,103 @@
+---
+title: "`r params$title`"
+author: "`r params$author`"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output:
+  html_document:
+    theme: flatly
+    toc: true
+    toc_float: true
+    df_print: paged
+  pdf_document:
+    toc: true
+    number_sections: true
+  word_document:
+    toc: true
+params:
+  results_path: ""
+  title: "CEAgroupR Report"
+  author: "CEAgroupR Package"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+results <- readRDS(params$results_path)
+library(ggplot2)
+library(knitr)
+```
+
+# Summary Statistics
+
+```{r summary}
+if (!is.null(results$summary_stats)) {
+kable(results$summary_stats, caption = "Summary of input data (costs and effects).")
+} else {
+cat("No summary statistics available.")
+}
+```
+
+# Incremental Cost-Effectiveness Plane (ICER)
+
+```{r icer}
+if ("cea_results_list" %in% class(results)) {
+print(plot(results, type = "icers"))
+} else {
+cat("ICER plot could not be generated (invalid results object).")
+}
+```
+
+# Cost-Effectiveness Acceptability Curves (CEAC)
+
+```{r ceacs}
+if ("cea_results_list" %in% class(results)) {
+print(plot(results, type = "ceacs"))
+} else {
+cat("CEAC plot could not be generated (invalid results object).")
+}
+
+```
+
+# Expected Value of Perfect Information (EVPI)
+
+```{r evpi}
+if ("cea_results_list" %in% class(results)) {
+print(plot(results, type = "evpis"))
+} else {
+cat("EVPI plot could not be generated (invalid results object).")
+}
+
+```
+
+# Marginal Distributions
+
+
+```{r marginals}
+if ("cea_results_list" %in% class(results)) {
+print(plot(results, type = "marginals"))
+} else {
+cat("Marginals plot could not be generated (invalid results object).")
+}
+
+```
+
+
+# Session Information
+
+```{r session_info}
+sessionInfo()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -44,8 +44,9 @@ combine_icers_results <- function(...) {
       if (is.null(df) || nrow(df) == 0) return(NULL)
       df$replicate <- seq_len(nrow(df))
       df$dataset <- dataset_name
-      df$subgroup_var <- ifelse(is.na(subgroup_var), "Overall", subgroup_var)
-      df$subgroup_level <- ifelse(is.na(subgroup_level), "Overall", subgroup_level)
+      # Force both subgroup_var and subgroup_level to character
+      df$subgroup_var <- ifelse(is.na(subgroup_var), "Overall", as.character(subgroup_var))
+      df$subgroup_level <- ifelse(is.na(subgroup_level), "Overall", as.character(subgroup_level))
       df
     }
 
