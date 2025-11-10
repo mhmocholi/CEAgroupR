@@ -18,34 +18,6 @@
   ...
 )
 }
-\arguments{
-\item{data}{A \code{cea_results_list} object from \code{compute_icers()} or a tibble
-returned by \code{combine_icers_results()}.}
-
-\item{color_by, shape_by, facet_by}{Mapping options
-("dataset", "subgroup_var", "subgroup_level", "both", or "none").
-If not specified, defaults are assigned automatically according to \code{mode}.}
-
-\item{mode}{Character. Determines which part of the data to display:
-"Full" (Overall + Subgroups), "Overall" (only overall results),
-or "Subgroups" (only subgroup-specific results). Default = "Overall".}
-
-\item{facet_scales}{Character. Facet scaling ("fixed", "free", etc.).}
-
-\item{lambda_max}{Numeric. Maximum λ value shown on the x-axis. If NULL,
-estimated automatically from ΔCost and ΔEffect.}
-
-\item{lambda_steps}{Integer. Number of λ values (default = 100).}
-
-\item{palette}{Character. Color palette name (default = "Set2").}
-
-\item{return_data}{Logical. If TRUE, returns the computed EVPI table.}
-
-\item{...}{Additional aesthetics (linewidth, alpha, etc.).}
-}
-\value{
-A ggplot object (default) or tibble if \code{return_data = TRUE}.
-}
 \description{
 Computes and plots the Expected Value of Perfect Information (EVPI)
 as a function of willingness-to-pay (λ) using bootstrap replicates.

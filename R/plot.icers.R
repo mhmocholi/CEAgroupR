@@ -123,39 +123,8 @@ plot.icers <- function(data,
     ggplot2::geom_hline(yintercept = 0, linetype = "dashed", colour = "grey70") +
     ggplot2::geom_vline(xintercept = 0, linetype = "dashed", colour = "grey70")
 
-  # ---- 8. Willingness-to-pay reference lines ----
-  if (show_lambdas && !is.null(lambda_vals)) {
-    for (l in lambda_vals) {
-      p <- p + ggplot2::geom_abline(
-        slope = l, intercept = 0,
-        linetype = "dotted", colour = "grey45", linewidth = 0.6
-      )
-    }
 
-    if (label_lambdas) {
-      label_df <- data.frame(lambda = lambda_vals)
-      x_max <- max(df$Delta_Effect, na.rm = TRUE)
-      label_df$x <- x_max * 0.85
-      label_df$y <- label_df$lambda * label_df$x
-
-      p <- p + ggplot2::geom_text(
-        data = label_df,
-        ggplot2::aes(
-          x = x,
-          y = y,
-          label = paste0("λ=", format(lambda, big.mark = ","))
-        ),
-        hjust = 0,
-        vjust = -0.3,
-        size = 3,
-        colour = "grey30",
-        inherit.aes = FALSE,
-        show.legend = FALSE
-      )
-    }
-  }
-
-  # ---- 9. Bootstrap points ----
+  # ---- 8. Bootstrap points ----
   if (show_points) {
     n_repl <- length(unique(df$replicate))
     alpha_auto <- min(0.9, max(0.3, 0.9 - 0.15 * log10(n_repl / 100)))
@@ -179,7 +148,7 @@ plot.icers <- function(data,
     )
   }
 
-  # ---- 10. Mean points ----
+  # ---- 9. Mean points ----
   means <- df %>%
     dplyr::group_by(group_uid) %>%
     dplyr::summarise(
@@ -225,6 +194,7 @@ plot.icers <- function(data,
     inherit.aes = FALSE
   )
 
+
   # Visible mean points
   if (show_means) {
     p <- p + ggplot2::geom_point(
@@ -243,7 +213,7 @@ plot.icers <- function(data,
     )
   }
 
-  # ---- 11. Contour layers ----
+  # ---- 10. Contour layers ----
   if (show_contours) {
 
     # Validate contour type and levels
@@ -283,7 +253,7 @@ plot.icers <- function(data,
       color_key <- as.character(unique(sub_df[[color_var]])[1])
       col_val <- colorspace::darken(color_lookup[[color_key]], amount = 0.25)
 
-      # ---- 11a. Elliptical contours ----
+      # ---- 10a. Elliptical contours ----
       if (contour_type == "ellipse") {
 
         mu <- colMeans(sub_df[, c("Delta_Effect", "Delta_Cost")], na.rm = TRUE)
@@ -315,7 +285,7 @@ plot.icers <- function(data,
           )
         }
 
-        # ---- 11b. Non-parametric (KDE) contours ----
+        # ---- 10b. Non-parametric (KDE) contours ----
       } else if (contour_type == "non_parametric") {
 
         dens <- tryCatch(
@@ -355,6 +325,38 @@ plot.icers <- function(data,
     }
   }
 
+
+  # ---- 11. Willingness-to-pay reference lines ----
+  if (show_lambdas && !is.null(lambda_vals)) {
+    for (l in lambda_vals) {
+      p <- p + ggplot2::geom_abline(
+        slope = l, intercept = 0,
+        linetype = "dashed", colour = "grey45", linewidth = 0.6
+      )
+    }
+
+    if (label_lambdas) {
+      label_df <- data.frame(lambda = lambda_vals)
+      x_max <- max(df$Delta_Effect, na.rm = TRUE)
+      label_df$x <- x_max * 0.85
+      label_df$y <- label_df$lambda * label_df$x
+
+      p <- p + ggplot2::geom_text(
+        data = label_df,
+        ggplot2::aes(
+          x = x,
+          y = y,
+          label = paste0("λ=", format(lambda, big.mark = ","))
+        ),
+        hjust = 0,
+        vjust = -0.3,
+        size = 3,
+        colour = "grey30",
+        inherit.aes = FALSE,
+        show.legend = FALSE
+      )
+    }
+  }
 
 
   # ---- 12. Final labels and legend ----

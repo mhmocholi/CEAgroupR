@@ -211,7 +211,6 @@ CEAgroupRui <- function() {
                                                           choices = c("none", "dataset", "subgroup_var", "subgroup_level")),
                                        shiny::selectInput("facet_by_marg", "Facet by:",
                                                           choices = c("none", "dataset", "subgroup_var")),
-                                       shiny::checkboxInput("compare_marg", "Show comparisons", FALSE),
                                        shiny::downloadButton("download_marg", "Download plot (PNG)"))),
               shiny::column(width = 9,
                             shiny::div(class = "plot-container",
@@ -359,10 +358,12 @@ CEAgroupRui <- function() {
     })
     output$plot_marginals <- shiny::renderPlot({
       shiny::req(results())
-      plot(results(), type = "marginals", variable = input$marg_variable,
-           geom_type = input$marg_geom, mode = input$mode_marg,
-           color_by = input$color_by_marg, facet_by = input$facet_by_marg,
-           compare = input$compare_marg)
+      plot(results(), type = "marginals",
+           variable = input$marg_variable,
+           geom_type = input$marg_geom,
+           mode = input$mode_marg,
+           color_by = input$color_by_marg,
+           facet_by = input$facet_by_marg)
     })
 
     # ---- Report generation ----

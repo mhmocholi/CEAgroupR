@@ -12,6 +12,7 @@
 #' @param mode Character. "Overall" (default), "Subgroups", or "Full".
 #' @param facet_scales Character. Facet scaling ("fixed", "free", etc.).
 #' @param palette Character. Color palette name.
+#' @param bins Integer. Number of bins for histograms (default = 30).
 #' @param ... Additional arguments passed to ggplot2 layers.
 #'
 #' @return A ggplot object.
@@ -25,6 +26,7 @@ plot.marginals <- function(data,
                            mode = "Overall",
                            facet_scales = "fixed",
                            palette = "Set2",
+                           bins = 30,
                            ...) {
 
   # ---- 1. Validate and extract combined data ----
@@ -34,9 +36,7 @@ plot.marginals <- function(data,
     df <- data$combined_replicates
   } else if (inherits(data, "data.frame")) {
     df <- data
-  } else {
-    stop("Invalid input: must be a cea_results_list or combined tibble.")
-  }
+  } else stop("Invalid input: must be a cea_results_list or combined tibble.")
 
   # ---- 2. Ensure group identifier ----
   if (!"group_uid" %in% names(df)) {
@@ -59,21 +59,18 @@ plot.marginals <- function(data,
     df <- df[df$subgroup_var != "Overall" & !is.na(df$subgroup_var), , drop = FALSE]
   }
 
-  # ---- 4. Auto-assign aesthetics by mode ----
+  # ---- 4. Auto-assign aesthetics ----
   if (is.null(color_by) || color_by %in% c("none", "")) {
     color_by <- switch(mode,
                        "Overall" = "dataset",
                        "Subgroups" = "subgroup_level",
-                       "Full" = "subgroup_level"
-    )
+                       "Full" = "subgroup_level")
   }
-
   if (is.null(facet_by) || facet_by %in% c("none", "")) {
     facet_by <- switch(mode,
                        "Overall" = "none",
                        "Subgroups" = "subgroup_var",
-                       "Full" = "subgroup_var"
-    )
+                       "Full" = "subgroup_var")
   }
 
   # ---- 5. Base layout ----
@@ -88,18 +85,23 @@ plot.marginals <- function(data,
   p <- base$plot
   color_var <- base$color_var
 
-  # ---- 6. Select variable to plot ----
+  # ---- 6. Variable selection ----
   var_col <- switch(variable,
                     "cost" = "Delta_Cost",
                     "effect" = "Delta_Effect",
                     stop("variable must be 'cost' or 'effect'.")
   )
 
-  # ---- 7. Add geometry (synchronized colour/fill palettes) ----
+  # ---- 7. Determine transparency ----
+  n_groups <- length(unique(df[[color_by]]))
   user_args <- list(...)
-  alpha_val <- if (!"alpha" %in% names(user_args)) 0.5 else user_args$alpha
+  alpha_val <- if (!"alpha" %in% names(user_args))
+    if (n_groups > 3) 0.4 else 0.6
+  else user_args$alpha
 
+  # ---- 8. Geometry selection ----
   if (geom_type == "density") {
+    line_w <- if (!"linewidth" %in% names(user_args)) 0.6 else user_args$linewidth
     p <- p + ggplot2::geom_density(
       data = df,
       mapping = ggplot2::aes(
@@ -109,7 +111,7 @@ plot.marginals <- function(data,
         group  = .data[[color_var]]
       ),
       alpha = alpha_val,
-      linewidth = 1,
+      linewidth = line_w,
       inherit.aes = FALSE
     )
 
@@ -122,7 +124,7 @@ plot.marginals <- function(data,
         colour = .data[[color_var]],
         group = .data[[color_var]]
       ),
-      bins = 30,
+      bins = bins,
       alpha = alpha_val,
       position = "identity",
       inherit.aes = FALSE
@@ -141,17 +143,19 @@ plot.marginals <- function(data,
       outlier.shape = 21,
       inherit.aes = FALSE
     )
-  } else {
-    stop("geom_type must be 'histogram', 'density', or 'boxplot'.")
-  }
+  } else stop("geom_type must be 'histogram', 'density', or 'boxplot'.")
 
-  # ---- 8. Colour scales (unified for colour and fill) ----
+  # ---- 9. Unified color scales ----
   p <- p +
-    ggplot2::scale_color_brewer(palette = palette, name = color_by) +
     ggplot2::scale_fill_brewer(palette = palette, name = color_by) +
-    ggplot2::guides(fill = "none")
+    ggplot2::scale_colour_brewer(palette = palette, guide = "none") +
+    ggplot2::guides(
+      fill = ggplot2::guide_legend(
+        override.aes = list(colour = NA, alpha = 0.8)
+      )
+    )
 
-  # ---- 9. Labels ----
+  # ---- 10. Labels ----
   label_y <- if (geom_type == "boxplot") "Value" else "Density"
   label_title <- paste("Distribution of Δ", tools::toTitleCase(variable), sep = "")
 
@@ -162,105 +166,6 @@ plot.marginals <- function(data,
       y = label_y,
       colour = color_by
     )
-  # ---- 10. Optional: pairwise comparison annotations (by geometry type, only in Subgroups mode) ----
-  if (mode == "Subgroups" && !is.null(list(...)$compare) && list(...)$compare == TRUE) {
-    alpha_sig <- if (!is.null(list(...)$alpha_sig)) list(...)$alpha_sig else 0.05
-    var_col <- switch(variable,
-                      "cost" = "Delta_Cost",
-                      "effect" = "Delta_Effect"
-    )
-
-    group_var <- df[[color_by]]
-    unique_groups <- unique(group_var)
-
-    if (length(unique_groups) > 1) {
-      combos <- combn(unique_groups, 2, simplify = FALSE)
-      results <- lapply(combos, function(grp) {
-        x <- df[df[[color_by]] == grp[1], var_col, drop = TRUE]
-        y <- df[df[[color_by]] == grp[2], var_col, drop = TRUE]
-        pval <- tryCatch(stats::t.test(x, y)$p.value, error = function(e) NA)
-        mean1 <- mean(x, na.rm = TRUE)
-        mean2 <- mean(y, na.rm = TRUE)
-        data.frame(group1 = grp[1], group2 = grp[2],
-                   mean1 = mean1, mean2 = mean2, pval = pval)
-      })
-      results_df <- do.call(rbind, results)
-      results_sig <- results_df[!is.na(results_df$pval) & results_df$pval < alpha_sig, ]
-
-      if (nrow(results_sig) > 0) {
-        # Format p-values
-        results_sig$p_label <- ifelse(
-          results_sig$pval < 0.001,
-          "p < 0.001",
-          paste0("p = ", formatC(results_sig$pval, digits = 3, format = "f"))
-        )
-
-        if (geom_type == "boxplot") {
-          # --- Standard positioning for boxplots ---
-          y_max <- max(df[[var_col]], na.rm = TRUE)
-          range_y <- max(df[[var_col]], na.rm = TRUE) - min(df[[var_col]], na.rm = TRUE)
-          step <- 0.10 * range_y
-          results_sig$y_pos <- y_max + seq_along(results_sig$pval) * step
-
-          p <- p +
-            ggplot2::geom_segment(
-              data = results_sig,
-              ggplot2::aes(
-                x = match(group1, unique_groups),
-                xend = match(group2, unique_groups),
-                y = y_pos,
-                yend = y_pos
-              ),
-              colour = "black",
-              linewidth = 0.8,
-              inherit.aes = FALSE
-            ) +
-            ggplot2::geom_text(
-              data = results_sig,
-              ggplot2::aes(
-                x = (match(group1, unique_groups) + match(group2, unique_groups)) / 2,
-                y = y_pos + (step / 3),
-                label = p_label
-              ),
-              size = 3.2,
-              inherit.aes = FALSE
-            )
-
-        } else if (geom_type %in% c("density", "histogram")) {
-          # --- Draw lines between group means for continuous geometries ---
-          y_top <- max(ggplot2::ggplot_build(p)$data[[1]]$y, na.rm = TRUE)
-          step <- 0.10 * y_top
-          results_sig$y_pos <- y_top + seq_along(results_sig$pval) * step
-
-          p <- p +
-            ggplot2::geom_segment(
-              data = results_sig,
-              ggplot2::aes(
-                x = mean1,
-                xend = mean2,
-                y = y_pos,
-                yend = y_pos
-              ),
-              colour = "black",
-              linewidth = 0.8,
-              inherit.aes = FALSE
-            ) +
-            ggplot2::geom_text(
-              data = results_sig,
-              ggplot2::aes(
-                x = (mean1 + mean2) / 2,
-                y = y_pos + (step / 3),
-                label = p_label
-              ),
-              size = 3.2,
-              inherit.aes = FALSE
-            )
-        }
-      }
-    }
-  } else if (mode != "Subgroups" && !is.null(list(...)$compare) && list(...)$compare == TRUE) {
-    message("Statistical comparison lines are only available in mode = 'Subgroups'.")
-  }
 
   return(p)
 }

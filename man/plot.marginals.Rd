@@ -14,6 +14,7 @@
   mode = "Overall",
   facet_scales = "fixed",
   palette = "Set2",
+  bins = 30,
   ...
 )
 }
@@ -32,6 +33,8 @@
 \item{facet_scales}{Character. Facet scaling ("fixed", "free", etc.).}
 
 \item{palette}{Character. Color palette name.}
+
+\item{bins}{Integer. Number of bins for histograms (default = 30).}
 
 \item{...}{Additional arguments passed to ggplot2 layers.}
 }
