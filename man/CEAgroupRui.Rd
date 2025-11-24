@@ -2,11 +2,11 @@
 % Please edit documentation in R/CEAgroupRui.R
 \name{CEAgroupRui}
 \alias{CEAgroupRui}
-\title{Launch interactive CEAgroupR Shiny interface (modern UI)}
+\title{Launch interactive CEAgroupR Shiny interface (refined classic UI)}
 \usage{
 CEAgroupRui()
 }
 \description{
 Interactive Shiny application for performing and visualizing
-cost-effectiveness analyses using the \pkg{CEAgroupR} package.
+multistrategy cost-effectiveness analyses using the CEAgroupR package.
 }

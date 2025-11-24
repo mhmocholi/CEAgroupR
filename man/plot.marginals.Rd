@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot.marginals.R
 \name{plot.marginals}
 \alias{plot.marginals}
-\title{Plot incremental cost or effect distributions}
+\title{Plot marginal distributions of incremental outcomes (ΔCost or ΔEffect)}
 \usage{
 \method{plot}{marginals}(
   data,
@@ -12,37 +12,51 @@
   shape_by = NULL,
   facet_by = NULL,
   mode = "Overall",
+  filter_expr = NULL,
   facet_scales = "fixed",
-  palette = "Set2",
+  palette = NULL,
   bins = 30,
   ...
 )
 }
 \arguments{
-\item{data}{A \code{cea_results_list} or a tibble returned by
-\code{\link{combine_icers_results}} containing incremental results.}
+\item{data}{A \code{cea_results_list} returned by \code{compute_icers()} or
+a tibble returned by \code{combine_icers_results()}.}
 
-\item{variable}{Character. Either "cost" (ΔCost) or "effect" (ΔEffect).}
+\item{variable}{Character: \code{"cost"} (ΔCost) or \code{"effect"} (ΔEffect).}
 
-\item{geom_type}{Character. One of "histogram", "density", or "boxplot". Default = "histogram".}
+\item{geom_type}{Character: \code{"histogram"}, \code{"density"}, or
+\code{"boxplot"}.}
 
-\item{color_by, shape_by, facet_by}{Mapping options.}
+\item{color_by, shape_by, facet_by}{Character variables defining aesthetics to
+map to colour, linetype, and facets.}
 
-\item{mode}{Character. "Overall" (default), "Subgroups", or "Full".}
+\item{mode}{Character, \code{"Overall"} or \code{"Subgroups"}.}
 
-\item{facet_scales}{Character. Facet scaling ("fixed", "free", etc.).}
+\item{filter_expr}{Optional tidy-style filtering expression.}
 
-\item{palette}{Character. Color palette name.}
+\item{facet_scales}{Facet scaling behaviour.}
 
-\item{bins}{Integer. Number of bins for histograms (default = 30).}
+\item{palette}{A colour palette (vector, Brewer name, or \code{NULL}).}
 
-\item{...}{Additional arguments passed to ggplot2 layers.}
+\item{bins}{Integer. Number of bins for histogram.}
+
+\item{...}{Additional arguments passed to geom layers.}
 }
 \value{
-A ggplot object.
+A \code{ggplot} object.
 }
 \description{
-Visualizes the marginal distributions of incremental costs or effects (ΔCost, ΔEffect)
-from bootstrap replications. Shares the same layout, modes, and mapping logic as
-\code{plot.icers()}, \code{plot.ceacs()}, and \code{plot.evpis()}.
+Visualizes marginal distributions of incremental costs (ΔCost) or incremental
+effects (ΔEffect) using bootstrap replicates. Supports histogram, density, and
+boxplot geometries. Fully aligned with the unified layout architecture of
+\code{plot.icers()}, \code{plot.ceacs()}, and \code{plot.evpis()}:
+}
+\details{
+• Option C behaviour for \code{color_by}, \code{shape_by}, \code{facet_by}.
+• Dynamic filtering with \code{filter_expr}.
+• Flexible palette specification (colour vectors, Brewer palettes, base R).
+• Consistent faceting, including the special \code{"subgroup"} mode.
+• \code{shape_by} → linetype for histogram/density/boxplot.
+• Legends unified to display colour and linetype cleanly and consistently.
 }

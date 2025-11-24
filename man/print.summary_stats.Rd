@@ -7,18 +7,21 @@
 \method{print}{summary_stats}(x, digits = 3, ...)
 }
 \arguments{
-\item{x}{A tibble produced by \code{\link{summarize_cea_data}}.}
+\item{x}{Tibble from summarize_cea_data().}
 
-\item{digits}{Integer. Number of decimal places to display (default = 3).}
+\item{digits}{Number of decimal places (except n_ref/n_alt which are integers).}
 
-\item{...}{Additional arguments (currently unused).}
-}
-\value{
-Invisibly returns the input object \code{x}.
+\item{...}{Unused.}
 }
 \description{
-Formats and prints descriptive summaries produced by
-\code{\link{summarize_cea_data}}. Compatible with the output of
-\code{\link{compute_icers}}, displaying also stored analysis settings
-if available.
+Produces three compact tables per dataset:
+\enumerate{
+\item Sample sizes
+\item Mean and SD of costs and effects
+\item Incremental outcomes (ΔCost, ΔEffect, ICER, NMB)
+}
+}
+\details{
+Each row corresponds to one combination:
+subgroup_var × subgroup_level × comparison
 }

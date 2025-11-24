@@ -7,18 +7,22 @@
 \method{print}{cea_results}(x, digits = 3, ...)
 }
 \arguments{
-\item{x}{An object of class \code{cea_results}, typically one element of the
-list returned by \code{\link{compute_icers}}.}
+\item{x}{An object of class \code{cea_results}.}
 
-\item{digits}{Integer. Number of decimal places to display (default = 3).}
+\item{digits}{Integer number of decimal places to display (default = 3).}
 
-\item{...}{Additional arguments (currently unused).}
+\item{...}{Additional arguments (unused).}
 }
 \value{
-Invisibly returns the input object \code{x} after printing its summary.
+Invisibly returns \code{x}.
 }
 \description{
-Displays a summary table of bootstrap results for each dataset and subgroup.
-If available, the method also prints information stored in the analysis
-settings (seed, reference group, date, etc.).
+Displays a structured overview of all cost-effectiveness comparisons
+(overall and subgroup-specific) stored within a \code{cea_results} object.
+}
+\details{
+The reference strategy is obtained from the shared analysis environment
+(\code{settings_env}) created by \code{compute_icers()}. Comparison labels are
+simplified to the name of the alternative strategy only, following the
+standardized naming convention used throughout the analytical layer.
 }

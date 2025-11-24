@@ -10,18 +10,72 @@
   shape_by = NULL,
   facet_by = NULL,
   mode = "Overall",
+  filter_expr = NULL,
   facet_scales = "fixed",
   lambda_max = NULL,
   lambda_steps = 100,
-  palette = "Set2",
+  show_lambdas = FALSE,
+  lambdas = NULL,
+  palette = NULL,
   return_data = FALSE,
   ...
 )
 }
+\arguments{
+\item{data}{A \code{cea_results_list} from \code{compute_icers()} or a tibble
+returned by \code{combine_icers_results()}.}
+
+\item{color_by, shape_by, facet_by}{Character variables for aesthetic mappings.
+Supported: \code{"dataset"}, \code{"comparison"}, \code{"subgroup_var"},
+\code{"subgroup_level"}, \code{"subgroup"}, or \code{"none"}.
+Missing values follow Option C.}
+
+\item{mode}{Character, either \code{"Overall"} or \code{"Subgroups"}.}
+
+\item{filter_expr}{Optional tidy-style filter expression applied to
+bootstrap replicates prior to computing EVPI.}
+
+\item{facet_scales}{Facet scaling behaviour.}
+
+\item{lambda_max}{Maximum λ on the x-axis. If \code{NULL}, a heuristic based
+on \eqn{|ΔCost/ΔEffect|} is used.}
+
+\item{lambda_steps}{Number of λ values used to compute EVPI.}
+
+\item{show_lambdas}{Logical; whether to draw vertical λ reference lines.}
+
+\item{lambdas}{Optional numeric λ values. If \code{NULL}, values used during
+\code{compute_icers()} are used when available.}
+
+\item{palette}{Colour palette: vector of colours, a Brewer palette name, or
+\code{NULL} for base R palette.}
+
+\item{return_data}{Logical; if \code{TRUE}, returns the EVPI table instead of
+a plot.}
+
+\item{...}{Additional arguments passed to \code{geom_line()}.}
+}
+\value{
+A \code{ggplot} object or a tibble of EVPI values.
+}
 \description{
-Computes and plots the Expected Value of Perfect Information (EVPI)
-as a function of willingness-to-pay (λ) using bootstrap replicates.
-Fully compatible with the visualization layout of \code{plot.icers()} and
-\code{plot.ceacs()}, including visualization modes ("Overall", "Subgroups", "Full")
-and automatic mapping of color, shape, and facet aesthetics.
+Computes and plots the Expected Value of Perfect Information (EVPI) as a
+function of willingness-to-pay (λ) using bootstrap replicates returned by
+\code{\link{compute_icers}}. EVPI is defined as the expected gain from
+eliminating all uncertainty in the decision problem.
+}
+\details{
+This function follows the unified graphical architecture used in
+\code{plot.icers()} and \code{plot.ceacs()}:
+\itemize{
+\item Option C behaviour for aesthetic mappings (\code{color_by},
+\code{shape_by}, \code{facet_by}).
+\item Full support for dynamic filtering using \code{filter_expr}.
+\item Flexible palette handling (user-defined vectors, Brewer palettes, or
+base R palette).
+\item Faceting rules consistent with subgroup structures, including the special
+\code{"subgroup"} grid.
+\item EVPI curves use linetype when \code{shape_by} is specified.
+\item λ values are shown using axis ticks rather than floating text labels.
+}
 }

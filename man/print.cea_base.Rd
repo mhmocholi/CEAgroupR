@@ -9,16 +9,29 @@
 \arguments{
 \item{x}{An object of class \code{cea_base}.}
 
-\item{digits}{Integer. Number of decimal places to display (default = 3).}
+\item{digits}{Integer, number of decimal places to display (default = 3).}
 
-\item{...}{Additional arguments (currently unused).}
+\item{...}{Additional arguments (unused).}
 }
 \value{
-Invisibly returns the input object \code{x} after printing its summary.
+Invisibly returns the input object \code{x}.
 }
 \description{
-Displays the main bootstrap summary statistics for a single cost-effectiveness
-analysis comparing two strategies (reference vs. intervention). The function
-reports mean estimates and 95\% confidence intervals (95\% CI), together with
-the original point estimates and bootstrap bias for each parameter.
+Displays bootstrap summary statistics for a single cost-effectiveness
+comparison between the reference strategy and one alternative strategy.
+}
+\details{
+The comparison label contains only the name of the alternative strategy
+for clarity. The reference strategy is retrieved from a shared analysis
+environment (\code{settings_env}) attached to each comparison object by
+\code{compute_icers()}, avoiding duplication of metadata while ensuring
+consistent reporting across the analytical layer.
+
+Reported values include:
+\itemize{
+\item Original point estimates
+\item Bootstrap means
+\item Bias
+\item 95\% confidence intervals (when available)
+}
 }

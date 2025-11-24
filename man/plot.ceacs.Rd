@@ -10,47 +10,68 @@
   shape_by = NULL,
   facet_by = NULL,
   mode = "Overall",
+  filter_expr = NULL,
   facet_scales = "fixed",
   lambda_max = NULL,
   lambda_steps = 100,
-  palette = "Set2",
+  show_acceptabilities = TRUE,
+  show_frontier = FALSE,
+  accept_limit = 0.95,
+  show_accept_limit = FALSE,
+  show_lambdas = FALSE,
+  lambdas = NULL,
+  palette = NULL,
   return_data = FALSE,
   ...
 )
 }
 \arguments{
-\item{data}{A \code{cea_results_list} object returned by \code{\link{compute_icers}}
-or a tibble returned by \code{\link{combine_icers_results}}.}
+\item{data}{A cea_results_list object or a tibble returned by
+combine_icers_results().}
 
-\item{color_by, shape_by, facet_by}{Mapping options
-("dataset", "subgroup_var", "subgroup_level", "both", or "none").
-If not specified, defaults are assigned automatically according to \code{mode}.}
+\item{color_by}{Character variable mapped to colour, or "none".}
 
-\item{mode}{Character. Determines which part of the data to display:
-"Full" (Overall + Subgroups), "Overall" (only overall results),
-or "Subgroups" (only subgroup-specific results). Default = "Overall".}
+\item{shape_by}{Character variable mapped to shape, or "none".}
 
-\item{facet_scales}{Character. Facet scaling ("fixed", "free", etc.).}
+\item{facet_by}{Faceting directive ("none", "dataset", "comparison",
+"subgroup_var", "subgroup_level", "subgroup").}
 
-\item{lambda_max}{Numeric. Maximum λ value shown on the x-axis.
-If NULL, estimated automatically from ΔCost and ΔEffect.}
+\item{mode}{Either "Overall" or "Subgroups".}
 
-\item{lambda_steps}{Integer. Number of λ values used to build the curves
-(default = 100; higher = smoother curves).}
+\item{filter_expr}{Optional tidyverse-style logical expression as character.}
 
-\item{palette}{Character. Color palette name for ggplot2 (default = "Set2").}
+\item{facet_scales}{Faceting scale behaviour.}
 
-\item{return_data}{Logical. If TRUE, returns the CEAC dataframe instead of a ggplot.}
+\item{lambda_max}{Maximum lambda displayed on the x-axis.}
 
-\item{...}{Additional arguments passed to ggplot2 layers (e.g., linewidth, alpha).}
+\item{lambda_steps}{Number of lambda values used to construct CEACs.}
+
+\item{show_acceptabilities}{Logical; draw CEAC curves.}
+
+\item{show_frontier}{Logical; draw the acceptability frontier.}
+
+\item{accept_limit}{Numeric; acceptability threshold (horizontal reference).}
+
+\item{show_accept_limit}{Logical; draw accept_limit reference line.}
+
+\item{show_lambdas}{Logical; draw vertical reference lines.}
+
+\item{lambdas}{Explicit lambda reference values.}
+
+\item{palette}{Manual palette vector or Brewer palette name.}
+
+\item{return_data}{Logical; return CEAC table instead of plotting.}
+
+\item{...}{Additional parameters forwarded to geoms.}
 }
 \value{
-A ggplot object (default) or a tibble if \code{return_data = TRUE}.
+A ggplot object or a list of CEAC tables.
 }
 \description{
-Computes and plots the probability of cost-effectiveness as a function of
-willingness-to-pay (λ) using bootstrap replicates from one or several analyses.
-Fully compatible with the visualization layout of \code{plot.icers()}, including
-visualization modes ("Overall", "Subgroups", "Full") and automatic mapping of
-color, shape, and facet aesthetics.
+Produces Cost-Effectiveness Acceptability Curves (CEACs) derived from bootstrap
+replicates produced by compute_icers(). CEACs represent, for each value of the
+willingness-to-pay threshold (lambda), the probability that an alternative
+strategy is cost-effective. The function supports multiple strategies,
+datasets, and subgroup structures, and follows the unified graphical
+architecture used in plot.icers().
 }

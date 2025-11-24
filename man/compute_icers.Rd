@@ -15,42 +15,49 @@ compute_icers(
   subgroup_vars = NULL,
   seed = NULL,
   verbose = FALSE,
-  ref_group = NULL
+  ref_group,
+  alt_groups = NULL
 )
 }
 \arguments{
-\item{data}{Data frame or list of data frames with required variables.}
+\item{data}{Data frame or list of data frames.}
 
-\item{group}{Character. Name of grouping variable.}
+\item{group}{Strategy variable name.}
 
-\item{cost}{Character. Name of cost variable.}
+\item{cost}{Cost variable name.}
 
-\item{effect}{Character. Name of effectiveness variable.}
+\item{effect}{Effectiveness variable name.}
 
-\item{R}{Integer. Number of bootstrap replications.}
+\item{R}{Number of bootstrap replications.}
 
-\item{lambda}{Numeric vector. Willingness-to-pay thresholds.}
+\item{lambda}{Numeric WTP threshold(s).}
 
-\item{ci_type}{Character. Type of confidence interval ("bca", "perc", etc.).}
+\item{ci_type}{Type of CI ("bca", "perc"...).}
 
-\item{subgroup_vars}{Character vector of subgrouping variables.}
+\item{subgroup_vars}{Optional subgroup variables (character vector).}
 
-\item{seed}{Optional integer to control reproducibility. If NULL, a random
-seed is generated and stored in the settings list.}
+\item{seed}{Optional seed for reproducibility.}
 
-\item{verbose}{Logical. If TRUE, progress messages and bars are displayed.
-Defaults to FALSE for CRAN-friendly silent execution.}
+\item{verbose}{Logical. Show progress bars and messages.}
 
-\item{ref_group}{Character. Specifies the reference (control) group level.
-If NULL, the first factor level is used by default.}
+\item{ref_group}{Reference strategy.}
+
+\item{alt_groups}{Vector of alternative strategies (optional).}
 }
 \value{
-A list of class \code{cea_results_list}.
+A \code{cea_results_list} object containing all analyses.
 }
 \description{
 Performs nonparametric bootstrap resampling to estimate incremental cost,
-incremental effectiveness, ICER, and Net Monetary Benefit (NMB) between two
-comparison groups. Supports multiple datasets and subgroup analyses.
-Includes progress tracking during bootstrap execution and confidence interval
-estimation.
+incremental effectiveness, ICER, and Net Monetary Benefit (NMB) between one
+reference strategy and one or more alternative strategies.
+}
+\details{
+Subgroup variables are internally normalized to factors to ensure complete
+structural consistency across all datasets and subgroup levels.
+\itemize{
+\item Numeric/Integer subgroups are converted to ordered factors.
+\item Character subgroups are converted to unordered factors preserving the
+observed level order.
+}
 }

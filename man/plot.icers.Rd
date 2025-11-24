@@ -10,61 +10,79 @@
   shape_by = NULL,
   facet_by = NULL,
   mode = "Overall",
+  filter_expr = NULL,
   show_points = TRUE,
   show_means = TRUE,
   show_contours = FALSE,
   show_lambdas = TRUE,
   label_lambdas = FALSE,
   contour_type = "non_parametric",
-  contour_level = c(0.5, 0.75, 0.95),
+  contour_level = 0.95,
   facet_scales = "fixed",
-  palette = "Set2",
+  palette = NULL,
   ...
 )
 }
 \arguments{
-\item{data}{A \code{cea_results_list} object returned by
-\code{\link{compute_icers}} or a tibble returned by
-\code{\link{combine_icers_results}}.}
+\item{data}{A cea_results_list object or a tibble returned by
+combine_icers_results().}
 
-\item{color_by, shape_by, facet_by}{Mapping options:
-"dataset", "subgroup_var", "subgroup_level", "both", or "none".
-If not provided, defaults are assigned automatically based on \code{mode}.}
+\item{color_by}{Character variable mapped to colour, or "none".}
 
-\item{mode}{Character. Determines which part of the data to display:
-"Full" (Overall + Subgroups), "Overall" (only overall results),
-or "Subgroups" (only subgroup-specific results). Default = "Overall".}
+\item{shape_by}{Character variable mapped to shape, or "none".}
 
-\item{show_points}{Logical. If TRUE, displays individual bootstrap samples.}
+\item{facet_by}{Faceting directive ("none", "dataset", "comparison",
+"subgroup_var", "subgroup_level", "subgroup").}
 
-\item{show_means}{Logical. If TRUE, displays mean ICER points for each group.}
+\item{mode}{Either "Overall" or "Subgroups".}
 
-\item{show_contours}{Logical. If TRUE, adds probability contour layers.}
+\item{filter_expr}{Optional tidyverse-style logical expression as character.}
 
-\item{show_lambdas}{Logical. If TRUE, draws willingness-to-pay (λ) lines.}
+\item{show_points}{Logical; draw bootstrap replicates.}
 
-\item{label_lambdas}{Logical. If TRUE, labels λ reference lines horizontally.}
+\item{show_means}{Logical; draw mean incremental points.}
 
-\item{contour_type}{Character. Either "non_parametric" (kernel density)
-or "ellipse" (covariance ellipse). Default = "non_parametric".}
+\item{show_contours}{Logical; draw contour layers.}
 
-\item{contour_level}{Numeric vector. Probability levels for contour display.
-Default = c(0.5, 0.75, 0.95).}
+\item{show_lambdas}{Logical; draw WTP threshold lines.}
 
-\item{facet_scales}{Character. Facet scaling option ("fixed", "free", etc.).}
+\item{label_lambdas}{Logical; write labels for WTP lines.}
 
-\item{palette}{Character. Color palette name for ggplot2 (default = "Set2").}
+\item{contour_type}{"non_parametric" (KDE) or "ellipse".}
 
-\item{...}{Additional graphical arguments passed to ggplot2 layers
-(for example, size, alpha).}
+\item{contour_level}{Probability level(s) for contour boundaries.}
+
+\item{facet_scales}{Faceting scale behaviour.}
+
+\item{palette}{Manual palette vector or Brewer palette name.}
+
+\item{...}{Additional parameters forwarded to geoms.}
 }
 \value{
-A ggplot object representing the incremental cost-effectiveness plane.
+A ggplot object.
 }
 \description{
-Generates an incremental cost-effectiveness (CE) plane displaying incremental
-costs and effects obtained from bootstrap replications. The function is fully
-compatible with datasets, subgroup variables, and subgroup levels. It allows
-optional display of bootstrap points, mean points, probability contours,
-and willingness-to-pay (λ) reference lines.
+Generates an incremental cost-effectiveness (CE) plane using the bootstrap
+replicates produced by compute_icers(). Supports multiple datasets,
+strategies, and subgroup structures. All visual components (bootstrap clouds,
+mean points, contour densities, and reference WTP lines) are built using the
+unified layout engine ce_plot_base().
+}
+\details{
+Principles:
+\enumerate{
+\item User-specified aesthetics override defaults.
+\item Setting an aesthetic to "none" disables it completely.
+}
+
+Default behaviour:
+• mode = "Overall":
+colour = "comparison"
+shape  = "dataset"
+facet  = "none"
+
+• mode = "Subgroups":
+colour = "comparison"
+shape  = "dataset"
+facet  = "subgroup" (grid)
 }

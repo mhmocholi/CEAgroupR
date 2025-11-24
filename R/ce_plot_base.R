@@ -1,126 +1,177 @@
-#' Internal layout manager for cost-effectiveness visualizations
+#' Internal layout constructor for cost-effectiveness visualizations
 #'
-#' Generates a flexible ggplot layout structure used by all visualization
-#' functions in the \pkg{CEAgroupR} package. It organises colour, shape,
-#' and facet mappings for cost-effectiveness outputs derived from
-#' \code{\link{compute_icers}}.
+#' This function provides the unified aesthetic and layout engine used by all
+#' graphical functions in the CEAgroupR package. It standardizes the handling of
+#' colour, shape, and facet mappings, the interpretation of user overrides, the
+#' resolution of palettes, and the configuration of legends and facet behaviour.
 #'
-#' This internal function is not exported and is used by specific plotting
-#' functions such as \code{plot.icers()}, \code{plot.ceacs()}, or
-#' \code{plot.evpis()} to ensure consistency in layout and aesthetics.
+#' The design follows two core principles:
+#'   1) User-specified aesthetics always override internally defined defaults.
+#'   2) Setting an aesthetic to "none" disables it completely.
+#'
+#' Importantly, \code{ce_plot_base()} does not impose any mode-dependent
+#' defaults. Instead, defaults for each visualization mode (e.g. Overall vs
+#' Subgroups) are resolved in the calling function (e.g. \code{plot.icers}),
+#' which sends explicit values for \code{color_by}, \code{shape_by}, and
+#' \code{facet_by}. This separation of responsibilities ensures that the layout
+#' engine remains stable and predictable.
+#'
+#' Supported faceting directives:
+#'   "none"           – no faceting applied
+#'   "dataset"        – facet_wrap(~ dataset)
+#'   "comparison"     – facet_wrap(~ comparison)
+#'   "subgroup_var"   – facet_wrap(~ subgroup_var)
+#'   "subgroup_level" – facet_wrap(~ subgroup_level)
+#'   "subgroup"       – facet_grid(subgroup_level ~ subgroup_var)
+#'
+#' @param data A tibble returned by \code{combine_icers_results()}.
+#' @param color_by Character, name of the column mapped to colour. Use "none" to
+#'   disable colour mapping. If \code{NULL}, no colour aesthetic is applied.
+#' @param shape_by Character, name of the column mapped to shape. Use "none" to
+#'   disable shape mapping. If \code{NULL}, no shape aesthetic is applied.
+#' @param facet_by Character specifying the faceting directive, or "none" for
+#'   no faceting.
+#' @param filter_expr Optional tidyverse-style filtering expression (as a
+#'   character string).
+#' @param facet_scales Character, passed to the \code{scales} argument of
+#'   \code{facet_wrap} or \code{facet_grid}.
+#' @param palette Either a vector of colours or the name of a Brewer palette.
+#' @param theme_base A ggplot2 theme object to be added to the plot.
+#' @param auto_layout Logical; retained for backward compatibility but now
+#'   disabled as a decision mechanism. All defaults must be explicitly supplied
+#'   by the caller.
+#'
+#' @return A list containing:
+#'   \item{plot}{A ggplot object containing the initialized layout}
+#'   \item{data}{The (optionally filtered) input data}
+#'   \item{color_var}{Character, resolved colour aesthetic variable}
+#'   \item{shape_var}{Character, resolved shape aesthetic variable}
+#'   \item{palette_values}{Resolved palette as a character vector}
+#'   \item{group_var}{The grouping variable internally used ("group_uid")}
 #'
 #' @noRd
 ce_plot_base <- function(data,
-                         color_by = "dataset",
-                         shape_by = "none",
-                         facet_by = "none",
-                         filter_expr = NULL,
-                         facet_scales = "fixed",
-                         palette = "Set2",
-                         theme_base = ggplot2::theme_bw()) {
+                         color_by      = NULL,
+                         shape_by      = NULL,
+                         facet_by      = NULL,
+                         filter_expr   = NULL,
+                         facet_scales  = "fixed",
+                         palette       = "Set2",
+                         theme_base    = ggplot2::theme_bw(),
+                         auto_layout   = TRUE) {
 
-  # ---- 1. Optional filtering ----
+  # ---------------------------------------------------------------------------
+  # 1. Optional data filtering
+  # ---------------------------------------------------------------------------
   if (!is.null(filter_expr)) {
     data <- dplyr::filter(data, !!rlang::parse_expr(filter_expr))
   }
 
-  # ---- 2. Normalise 'none' and missing aesthetics ----
-  if (color_by %in% c("none", "", NA)) color_by <- NULL
-  if (shape_by %in% c("none", "", NA)) shape_by <- NULL
-  if (facet_by %in% c("none", "", NA)) facet_by <- NULL
+  # ---------------------------------------------------------------------------
+  # 2. Interpret user intent
+  # ---------------------------------------------------------------------------
+  disable_color <- identical(color_by, "none")
+  disable_shape <- identical(shape_by, "none")
+  disable_facet <- identical(facet_by, "none")
 
-  # ---- 3. Handle conflict between color_by and facet_by ----
-  if (identical(color_by, "both") && identical(facet_by, "both")) {
-    message("Simplifying mapping: when both color_by and facet_by = 'both', ",
-            "color_by is internally set to 'subgroup_level' for clarity.")
-    color_by <- "subgroup_level"
+  normalize <- function(x) {
+    if (is.null(x) || identical(x, "none")) return(NULL)
+    x
   }
 
-  # ---- 4. Legend and identifiers ----
-  legend_shape_title <- NULL
-  if (!is.null(shape_by) && shape_by %in% names(data)) {
-    legend_shape_title <- shape_by
+  color_by <- normalize(color_by)
+  shape_by <- normalize(shape_by)
+  facet_by <- normalize(facet_by)
+
+  # ---------------------------------------------------------------------------
+  # 3. Validate aesthetic variables
+  # ---------------------------------------------------------------------------
+  exists_var <- function(v) !is.null(v) && v %in% names(data)
+
+  if (!exists_var(color_by)) color_by <- NULL
+  if (!exists_var(shape_by)) shape_by <- NULL
+
+  # shape aesthetics require factor levels
+  if (!is.null(shape_by)) {
+    data[[shape_by]] <- as.factor(data[[shape_by]])
   }
 
-  if (!"group_uid" %in% names(data)) {
-    data$group_uid <- with(data, paste0(dataset, "_", subgroup_var, "_", subgroup_level))
+  # ---------------------------------------------------------------------------
+  # 4. Resolve colour palette
+  # ---------------------------------------------------------------------------
+  if (is.null(palette)) {
+    palette_values <- grDevices::palette()
+  } else if (length(palette) == 1 &&
+             palette %in% rownames(RColorBrewer::brewer.pal.info)) {
+    palette_values <- RColorBrewer::brewer.pal(
+      RColorBrewer::brewer.pal.info[palette, "maxcolors"],
+      palette
+    )
+  } else {
+    palette_values <- palette
   }
 
-  # ---- 5. Aesthetic variables ----
-  color_var <- if (!is.null(color_by) && color_by %in% names(data)) color_by else NULL
-  shape_var <- if (!is.null(shape_by) && shape_by %in% names(data)) shape_by else NULL
-
-  # ---- 6. Define facet formula ----
-  facet_formula <- NULL
-  if (!is.null(facet_by)) {
-    if (facet_by == "both") {
-      facet_formula <- as.formula("dataset ~ subgroup_var")
-    } else {
-      facet_formula <- as.formula(paste("~", facet_by))
-    }
-  }
-
-  # ---- 7. Base aesthetic mapping ----
-  aes_mappings <- list(
-    x = quote(Delta_Effect),
-    y = quote(Delta_Cost),
+  # ---------------------------------------------------------------------------
+  # 5. Core aesthetic mapping
+  # ---------------------------------------------------------------------------
+  aes_map <- list(
+    x     = quote(Delta_Effect),
+    y     = quote(Delta_Cost),
     group = quote(group_uid)
   )
-  if (!is.null(color_var)) aes_mappings$colour <- rlang::sym(color_var)
-  if (!is.null(shape_var)) aes_mappings$shape  <- rlang::sym(shape_var)
+  if (!is.null(color_by)) aes_map$colour <- rlang::sym(color_by)
+  if (!is.null(shape_by)) aes_map$shape  <- rlang::sym(shape_by)
 
-  # ---- 8. Construct base ggplot ----
-  p <- ggplot2::ggplot(
-    data = data,
-    mapping = do.call(ggplot2::aes, aes_mappings)
-  ) +
-    ggplot2::scale_color_brewer(palette = palette) +
+  # ---------------------------------------------------------------------------
+  # 6. Initialize base plot
+  # ---------------------------------------------------------------------------
+  p <- ggplot2::ggplot(data, do.call(ggplot2::aes, aes_map)) +
     theme_base +
     ggplot2::theme(
-      panel.grid.minor = ggplot2::element_blank(),
       panel.grid.major = ggplot2::element_blank(),
-      axis.text.x = ggplot2::element_text(size = 10, family = "sans", colour = "black"),
-      axis.text.y = ggplot2::element_text(size = 10, family = "sans", colour = "black"),
-      axis.title.x = ggplot2::element_text(size = 11, face = "plain"),
-      axis.title.y = ggplot2::element_text(size = 11, face = "plain"),
-      strip.background = ggplot2::element_rect(fill = "grey90", colour = NA),
-      strip.text = ggplot2::element_text(size = 10)
+      panel.grid.minor = ggplot2::element_blank(),
+      strip.background = ggplot2::element_rect(fill = "grey90", colour = NA)
     )
 
-  # ---- 9. Add facets if requested ----
-  if (!is.null(facet_formula)) {
-    if (facet_by == "both") {
-      p <- p + ggplot2::facet_grid(facet_formula, scales = facet_scales)
-    } else {
-      p <- p + ggplot2::facet_wrap(facet_formula, scales = facet_scales)
+  # ---------------------------------------------------------------------------
+  # 7. Faceting (explicit directive only)
+  # ---------------------------------------------------------------------------
+  if (!is.null(facet_by)) {
+
+    if (facet_by == "subgroup") {
+      p <- p +
+        ggplot2::facet_grid(
+          rows   = ggplot2::vars(subgroup_level),
+          cols   = ggplot2::vars(subgroup_var),
+          scales = facet_scales
+        )
+
+    } else if (facet_by %in% c("dataset","comparison",
+                               "subgroup_var","subgroup_level")) {
+
+      p <- p +
+        ggplot2::facet_wrap(
+          ggplot2::vars(!!rlang::sym(facet_by)),
+          scales = facet_scales
+        )
     }
   }
 
-  # ---- 10. Legends ----
-  if (!is.null(color_by) && color_by %in% names(data)) {
-    p <- p + ggplot2::labs(colour = color_by)
-  }
-  if (!is.null(legend_shape_title)) {
-    p <- p + ggplot2::labs(linetype = legend_shape_title, shape = legend_shape_title)
-  }
+  # ---------------------------------------------------------------------------
+  # 8. Configure legend visibility
+  # ---------------------------------------------------------------------------
+  if (is.null(color_by)) p <- p + ggplot2::guides(colour = "none")
+  if (is.null(shape_by)) p <- p + ggplot2::guides(shape  = "none")
 
-  # ---- 11. Return structured object ----
-  return(list(
-    plot = p,
-    data = data,
-    color_var = color_var,
-    shape_var = shape_var,
-    facet_formula = facet_formula,
-    group_var = "group_uid"
-  ))
+  # ---------------------------------------------------------------------------
+  # 9. Output
+  # ---------------------------------------------------------------------------
+  list(
+    plot          = p,
+    data          = data,
+    color_var     = color_by,
+    shape_var     = shape_by,
+    palette_values = palette_values,
+    group_var     = "group_uid"
+  )
 }
-
-# ---- 12. Global numeric label and display options ----
-# Apply globally across all ggplot visualizations in the package
-options(
-  scipen = 999,              # Disable scientific notation globally
-  digits = 6                 # Keep standard decimal precision
-)
-
-# Optional: adjust default point size slightly for visual consistency
-ggplot2::update_geom_defaults("point", list(size = 2))

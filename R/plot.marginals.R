@@ -1,21 +1,41 @@
-#' Plot incremental cost or effect distributions
+#' Plot marginal distributions of incremental outcomes (ΔCost or ΔEffect)
 #'
-#' Visualizes the marginal distributions of incremental costs or effects (ΔCost, ΔEffect)
-#' from bootstrap replications. Shares the same layout, modes, and mapping logic as
-#' \code{plot.icers()}, \code{plot.ceacs()}, and \code{plot.evpis()}.
+#' Visualizes marginal distributions of incremental costs (ΔCost) or incremental
+#' effects (ΔEffect) using bootstrap replicates. Supports histogram, density, and
+#' boxplot geometries. Fully aligned with the unified layout architecture of
+#' \code{plot.icers()}, \code{plot.ceacs()}, and \code{plot.evpis()}:
 #'
-#' @param data A \code{cea_results_list} or a tibble returned by
-#'   \code{\link{combine_icers_results}} containing incremental results.
-#' @param variable Character. Either "cost" (ΔCost) or "effect" (ΔEffect).
-#' @param geom_type Character. One of "histogram", "density", or "boxplot". Default = "histogram".
-#' @param color_by,shape_by,facet_by Mapping options.
-#' @param mode Character. "Overall" (default), "Subgroups", or "Full".
-#' @param facet_scales Character. Facet scaling ("fixed", "free", etc.).
-#' @param palette Character. Color palette name.
-#' @param bins Integer. Number of bins for histograms (default = 30).
-#' @param ... Additional arguments passed to ggplot2 layers.
+#'   • Option C behaviour for \code{color_by}, \code{shape_by}, \code{facet_by}.
+#'   • Dynamic filtering with \code{filter_expr}.
+#'   • Flexible palette specification (colour vectors, Brewer palettes, base R).
+#'   • Consistent faceting, including the special \code{"subgroup"} mode.
+#'   • \code{shape_by} → linetype for histogram/density/boxplot.
+#'   • Legends unified to display colour and linetype cleanly and consistently.
 #'
-#' @return A ggplot object.
+#' @param data A \code{cea_results_list} returned by \code{compute_icers()} or
+#'   a tibble returned by \code{combine_icers_results()}.
+#'
+#' @param variable Character: \code{"cost"} (ΔCost) or \code{"effect"} (ΔEffect).
+#'
+#' @param geom_type Character: \code{"histogram"}, \code{"density"}, or
+#'   \code{"boxplot"}.
+#'
+#' @param color_by,shape_by,facet_by Character variables defining aesthetics to
+#'   map to colour, linetype, and facets.
+#'
+#' @param mode Character, \code{"Overall"} or \code{"Subgroups"}.
+#'
+#' @param filter_expr Optional tidy-style filtering expression.
+#'
+#' @param facet_scales Facet scaling behaviour.
+#'
+#' @param palette A colour palette (vector, Brewer name, or \code{NULL}).
+#'
+#' @param bins Integer. Number of bins for histogram.
+#'
+#' @param ... Additional arguments passed to geom layers.
+#'
+#' @return A \code{ggplot} object.
 #' @export
 plot.marginals <- function(data,
                            variable = "cost",
@@ -24,147 +44,242 @@ plot.marginals <- function(data,
                            shape_by = NULL,
                            facet_by = NULL,
                            mode = "Overall",
+                           filter_expr = NULL,
                            facet_scales = "fixed",
-                           palette = "Set2",
+                           palette = NULL,
                            bins = 30,
                            ...) {
 
-  # ---- 1. Validate and extract combined data ----
+  `%||%` <- function(a, b) if (!is.null(a)) a else b
+
+  # -------------------------------------------------------------
+  # 1. Extract replicates
+  # -------------------------------------------------------------
   if (inherits(data, "cea_results_list")) {
     if (is.null(data$combined_replicates))
-      stop("The object has no 'combined_replicates' element. Run compute_icers() first.")
+      stop("'combined_replicates' not found. Run compute_icers().")
     df <- data$combined_replicates
   } else if (inherits(data, "data.frame")) {
     df <- data
-  } else stop("Invalid input: must be a cea_results_list or combined tibble.")
+  } else stop("Input must be a cea_results_list or data frame.")
 
-  # ---- 2. Ensure group identifier ----
   if (!"group_uid" %in% names(df)) {
-    df$group_uid <- with(df, paste0(dataset, "_", subgroup_var, "_", subgroup_level))
+    df$group_uid <- with(df,
+                         paste(dataset, subgroup_var, subgroup_level, comparison, sep = "_"))
   }
 
-  # ---- 3. Determine visualization mode ----
-  valid_modes <- c("Full", "Overall", "Subgroups")
-  mode <- match.arg(mode, valid_modes)
-
-  subgroup_mapped <- any(c(color_by, shape_by, facet_by) %in% c("subgroup_var", "subgroup_level"))
-  if (mode == "Overall" && subgroup_mapped) {
-    mode <- "Subgroups"
-    message("Mode automatically set to 'Subgroups' based on mapping aesthetics.")
+  # -------------------------------------------------------------
+  # 2. Filtering
+  # -------------------------------------------------------------
+  if (!is.null(filter_expr)) {
+    expr <- rlang::parse_expr(filter_expr)
+    df <- tryCatch(dplyr::filter(df, !!expr),
+                   error = function(e) stop("Filtering failed: ", e$message))
   }
 
+  # -------------------------------------------------------------
+  # 3. Mode filtering
+  # -------------------------------------------------------------
+  mode <- match.arg(mode, c("Overall", "Subgroups"))
   if (mode == "Overall") {
-    df <- df[df$subgroup_var == "Overall" | is.na(df$subgroup_var), , drop = FALSE]
-  } else if (mode == "Subgroups") {
-    df <- df[df$subgroup_var != "Overall" & !is.na(df$subgroup_var), , drop = FALSE]
+    df <- df[df$subgroup_var == "Overall" | is.na(df$subgroup_var), ]
+  } else {
+    df <- df[df$subgroup_var != "Overall" & !is.na(df$subgroup_var), ]
   }
 
-  # ---- 4. Auto-assign aesthetics ----
-  if (is.null(color_by) || color_by %in% c("none", "")) {
-    color_by <- switch(mode,
-                       "Overall" = "dataset",
-                       "Subgroups" = "subgroup_level",
-                       "Full" = "subgroup_level")
-  }
-  if (is.null(facet_by) || facet_by %in% c("none", "")) {
-    facet_by <- switch(mode,
-                       "Overall" = "none",
-                       "Subgroups" = "subgroup_var",
-                       "Full" = "subgroup_var")
+  # -------------------------------------------------------------
+  # 4. Facet defaults (Option C logic)
+  # -------------------------------------------------------------
+  if (!is.null(facet_by) && !(facet_by %in% c("", NA, "none"))) {
+    facet_input <- facet_by
+  } else if (mode == "Overall") {
+    facet_input <- NULL
+  } else {
+    facet_input <- "auto"   # ce_plot_base → faceting by subgroup grid
   }
 
-  # ---- 5. Base layout ----
+  # -------------------------------------------------------------
+  # 5. Base plot with unified layout manager
+  # -------------------------------------------------------------
   base <- ce_plot_base(
-    data = df,
-    color_by = color_by,
-    shape_by = "none",
-    facet_by = facet_by,
+    data         = df,
+    color_by     = color_by,
+    shape_by     = shape_by,
+    facet_by     = facet_input,
     facet_scales = facet_scales,
-    palette = palette
+    palette      = palette,
+    auto_layout  = TRUE
   )
-  p <- base$plot
+
+  p         <- base$plot
   color_var <- base$color_var
+  shape_var <- base$shape_var
 
-  # ---- 6. Variable selection ----
-  var_col <- switch(variable,
-                    "cost" = "Delta_Cost",
-                    "effect" = "Delta_Effect",
-                    stop("variable must be 'cost' or 'effect'.")
+  # -------------------------------------------------------------
+  # 6. Δ variable selection
+  # -------------------------------------------------------------
+  var_col <- switch(
+    variable,
+    "cost"   = "Delta_Cost",
+    "effect" = "Delta_Effect",
+    stop("variable must be 'cost' or 'effect'.")
   )
 
-  # ---- 7. Determine transparency ----
-  n_groups <- length(unique(df[[color_by]]))
-  user_args <- list(...)
-  alpha_val <- if (!"alpha" %in% names(user_args))
-    if (n_groups > 3) 0.4 else 0.6
-  else user_args$alpha
+  # -------------------------------------------------------------
+  # 7. User args
+  # -------------------------------------------------------------
+  args      <- list(...)
+  alpha_val <- args$alpha %||% 0.5
+  lw        <- args$linewidth %||% 0.6
 
-  # ---- 8. Geometry selection ----
+  # -------------------------------------------------------------
+  # 8. Palette + darkened borders
+  # -------------------------------------------------------------
+  use_col <- base$palette_values
+  names(use_col) <- sort(unique(as.character(df[[color_var]])))
+  dark_cols <- colorspace::darken(use_col, amount = 0.30)
+  names(dark_cols) <- names(use_col)
+
+  # dynamic linetype
+  if (!is.null(shape_var)) {
+    linetype_vals <- setNames(
+      c("solid","dashed","dotdash","dotted")[seq_along(sort(unique(df[[shape_var]])))],
+      sort(unique(df[[shape_var]]))
+    )
+  }
+
+  # -------------------------------------------------------------
+  # 9. Geometries
+  # -------------------------------------------------------------
+
+  # ---- DENSITY ----
   if (geom_type == "density") {
-    line_w <- if (!"linewidth" %in% names(user_args)) 0.6 else user_args$linewidth
-    p <- p + ggplot2::geom_density(
-      data = df,
-      mapping = ggplot2::aes(
-        x = .data[[var_col]],
-        colour = .data[[color_var]],
-        fill   = .data[[color_var]],
-        group  = .data[[color_var]]
-      ),
-      alpha = alpha_val,
-      linewidth = line_w,
-      inherit.aes = FALSE
+
+    aes_density <- ggplot2::aes(
+      x        = .data[[var_col]],
+      fill     = if (!is.null(color_var)) .data[[color_var]] else NULL,
+      colour   = if (!is.null(color_var)) .data[[color_var]] else NULL,
+      linetype = if (!is.null(shape_var)) .data[[shape_var]] else NULL,
+      group    = group_uid
     )
 
+    p <- p +
+      ggplot2::geom_density(
+        data = df,
+        mapping = aes_density,
+        alpha = alpha_val,
+        linewidth = lw,
+        inherit.aes = FALSE
+      )
+
+    # ---- HISTOGRAM ----
   } else if (geom_type == "histogram") {
-    p <- p + ggplot2::geom_histogram(
-      data = df,
-      mapping = ggplot2::aes(
-        x = .data[[var_col]],
-        fill = .data[[color_var]],
-        colour = .data[[color_var]],
-        group = .data[[color_var]]
-      ),
-      bins = bins,
-      alpha = alpha_val,
-      position = "identity",
-      inherit.aes = FALSE
+
+    aes_hist <- ggplot2::aes(
+      x        = .data[[var_col]],
+      fill     = if (!is.null(color_var)) .data[[color_var]] else NULL,
+      colour   = if (!is.null(color_var)) .data[[color_var]] else NULL,
+      linetype = if (!is.null(shape_var)) .data[[shape_var]] else NULL,
+      group    = group_uid
     )
 
+    p <- p +
+      ggplot2::geom_histogram(
+        data        = df,
+        mapping     = aes_hist,
+        bins        = bins,
+        alpha       = alpha_val,
+        position    = "identity",
+        linewidth   = lw,
+        inherit.aes = FALSE
+      )
+
+    # ---- BOXPLOT ----
   } else if (geom_type == "boxplot") {
-    p <- p + ggplot2::geom_boxplot(
-      data = df,
-      mapping = ggplot2::aes(
-        x = .data[[color_var]],
-        y = .data[[var_col]],
-        fill = .data[[color_var]],
-        colour = .data[[color_var]]
-      ),
-      alpha = alpha_val,
-      outlier.shape = 21,
-      inherit.aes = FALSE
+
+    aes_box <- ggplot2::aes(
+      x        = if (!is.null(shape_var)) .data[[shape_var]] else "All",
+      y        = .data[[var_col]],
+      fill     = if (!is.null(color_var)) .data[[color_var]] else NULL,
+      colour   = if (!is.null(color_var)) .data[[color_var]] else NULL,
+      linetype = if (!is.null(shape_var)) .data[[shape_var]] else NULL
     )
+
+    p <- p +
+      ggplot2::geom_boxplot(
+        data        = df,
+        mapping     = aes_box,
+        alpha       = alpha_val,
+        outlier.shape = 21,
+        outlier.size  = 1.5,
+        inherit.aes   = FALSE
+      )
+
   } else stop("geom_type must be 'histogram', 'density', or 'boxplot'.")
 
-  # ---- 9. Unified color scales ----
-  p <- p +
-    ggplot2::scale_fill_brewer(palette = palette, name = color_by) +
-    ggplot2::scale_colour_brewer(palette = palette, guide = "none") +
-    ggplot2::guides(
-      fill = ggplot2::guide_legend(
-        override.aes = list(colour = NA, alpha = 0.8)
-      )
-    )
+  # -------------------------------------------------------------
+  # 10. Unified scales + LEGEND FIX (colour + linetype)
+  # -------------------------------------------------------------
+  if (!is.null(color_var)) {
 
-  # ---- 10. Labels ----
-  label_y <- if (geom_type == "boxplot") "Value" else "Density"
-  label_title <- paste("Distribution of Δ", tools::toTitleCase(variable), sep = "")
+    p <- p +
+      ggplot2::scale_fill_manual(values = use_col,  name = color_var) +
+      ggplot2::scale_colour_manual(values = dark_cols, name = color_var)
+
+    if (!is.null(shape_var)) {
+
+      p <- p +
+        ggplot2::scale_linetype_manual(values = linetype_vals, name = shape_var) +
+        ggplot2::guides(
+          fill     = ggplot2::guide_legend(title = color_var),
+          colour   = ggplot2::guide_legend(title = color_var),
+          linetype = ggplot2::guide_legend(
+            title = shape_var,
+            override.aes = list(
+              fill     = rep("grey80", length(linetype_vals)),
+              colour   = rep("black", length(linetype_vals)),
+              linetype = linetype_vals,
+              size     = 0.8
+            )
+          )
+        )
+
+    } else {
+      p <- p +
+        ggplot2::guides(
+          fill   = ggplot2::guide_legend(title = color_var),
+          colour = ggplot2::guide_legend(title = color_var)
+        )
+    }
+  }
+
+  # -------------------------------------------------------------
+  # 11. Axis formatting
+  # -------------------------------------------------------------
+  if (geom_type == "boxplot") {
+
+    p <- p +
+      ggplot2::scale_x_discrete() +
+      ggplot2::scale_y_continuous(labels = scales::label_number())
+
+  } else {
+
+    p <- p +
+      ggplot2::scale_x_continuous(labels = scales::label_number()) +
+      ggplot2::scale_y_continuous(labels = scales::label_number())
+  }
+
+  # -------------------------------------------------------------
+  # 12. Labels
+  # -------------------------------------------------------------
+  label_y    <- if (geom_type == "boxplot") "Value" else "Density"
+  label_main <- paste("Distribution of Δ", tools::toTitleCase(variable), sep="")
 
   p <- p +
     ggplot2::labs(
-      title = label_title,
-      x = paste("Δ", tools::toTitleCase(variable)),
-      y = label_y,
-      colour = color_by
+      title = label_main,
+      x     = paste("Δ", tools::toTitleCase(variable)),
+      y     = label_y
     )
 
   return(p)
