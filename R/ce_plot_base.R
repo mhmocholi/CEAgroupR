@@ -1,129 +1,125 @@
-#' Internal layout constructor for cost-effectiveness visualizations
+#' Internal layout constructor for all cost-effectiveness visualizations
 #'
-#' This function provides the unified aesthetic and layout engine used by all
-#' graphical functions in the CEAgroupR package. It standardizes the handling of
-#' colour, shape, and facet mappings, the interpretation of user overrides, the
-#' resolution of palettes, and the configuration of legends and facet behaviour.
+#' Provides the unified aesthetic and layout engine used across all CEAgroupR
+#' graphical functions. It standardizes colour mapping, optional shape mapping,
+#' faceting, palette resolution, legend visibility, and returns unified sets of
+#' shapes/linetypes for use by downstream plotting functions.
 #'
-#' The design follows two core principles:
-#'   1) User-specified aesthetics always override internally defined defaults.
-#'   2) Setting an aesthetic to "none" disables it completely.
+#' This function does *not* apply any automatic defaults for `color_by`,
+#' `shape_by`, or `facet_by`. Calling functions must supply these explicitly.
 #'
-#' Importantly, \code{ce_plot_base()} does not impose any mode-dependent
-#' defaults. Instead, defaults for each visualization mode (e.g. Overall vs
-#' Subgroups) are resolved in the calling function (e.g. \code{plot.icers}),
-#' which sends explicit values for \code{color_by}, \code{shape_by}, and
-#' \code{facet_by}. This separation of responsibilities ensures that the layout
-#' engine remains stable and predictable.
+#' @param data A tibble produced by `combine_icers_results()`.
+#' @param color_by Character column mapped to colour, or `"none"`.
+#' @param shape_by Character column mapped to shape/linetype, or `"none"`.
+#' @param facet_by Faceting directive or `"none"`.
+#' @param filter_expr Optional tidyverse-style filter expression.
+#' @param facet_scales Faceting scale behaviour.
+#' @param palette Named vector or Brewer palette name.
+#' @param theme_base ggplot2 theme applied to the base plot.
+#' @param auto_layout Ignored; retained for backward compatibility.
 #'
-#' Supported faceting directives:
-#'   "none"           – no faceting applied
-#'   "dataset"        – facet_wrap(~ dataset)
-#'   "comparison"     – facet_wrap(~ comparison)
-#'   "subgroup_var"   – facet_wrap(~ subgroup_var)
-#'   "subgroup_level" – facet_wrap(~ subgroup_level)
-#'   "subgroup"       – facet_grid(subgroup_level ~ subgroup_var)
-#'
-#' @param data A tibble returned by \code{combine_icers_results()}.
-#' @param color_by Character, name of the column mapped to colour. Use "none" to
-#'   disable colour mapping. If \code{NULL}, no colour aesthetic is applied.
-#' @param shape_by Character, name of the column mapped to shape. Use "none" to
-#'   disable shape mapping. If \code{NULL}, no shape aesthetic is applied.
-#' @param facet_by Character specifying the faceting directive, or "none" for
-#'   no faceting.
-#' @param filter_expr Optional tidyverse-style filtering expression (as a
-#'   character string).
-#' @param facet_scales Character, passed to the \code{scales} argument of
-#'   \code{facet_wrap} or \code{facet_grid}.
-#' @param palette Either a vector of colours or the name of a Brewer palette.
-#' @param theme_base A ggplot2 theme object to be added to the plot.
-#' @param auto_layout Logical; retained for backward compatibility but now
-#'   disabled as a decision mechanism. All defaults must be explicitly supplied
-#'   by the caller.
-#'
-#' @return A list containing:
-#'   \item{plot}{A ggplot object containing the initialized layout}
-#'   \item{data}{The (optionally filtered) input data}
-#'   \item{color_var}{Character, resolved colour aesthetic variable}
-#'   \item{shape_var}{Character, resolved shape aesthetic variable}
-#'   \item{palette_values}{Resolved palette as a character vector}
-#'   \item{group_var}{The grouping variable internally used ("group_uid")}
+#' @return A list with components:
+#'   * `plot` – initialized ggplot object
+#'   * `data` – filtered data
+#'   * `color_var` – resolved colour aesthetic
+#'   * `shape_var` – resolved variable for shape/linetype
+#'   * `linetype_values` – named vector of valid linetype patterns (if applicable)
+#'   * `shape_values` – named vector of point shapes (if applicable)
+#'   * `palette_values` – colour palette values
+#'   * `group_var` – internal grouping variable
 #'
 #' @noRd
-ce_plot_base <- function(data,
-                         color_by      = NULL,
-                         shape_by      = NULL,
-                         facet_by      = NULL,
-                         filter_expr   = NULL,
-                         facet_scales  = "fixed",
-                         palette       = "Set2",
-                         theme_base    = ggplot2::theme_bw(),
-                         auto_layout   = TRUE) {
+ce_plot_base <- function(
+    data,
+    color_by      = NULL,
+    shape_by      = NULL,
+    facet_by      = NULL,
+    filter_expr   = NULL,
+    facet_scales  = "fixed",
+    palette       = "Set2",
+    theme_base    = ggplot2::theme_bw(),
+    auto_layout   = TRUE
+) {
 
   # ---------------------------------------------------------------------------
-  # 1. Optional data filtering
+  # Internal utilities
+  # ---------------------------------------------------------------------------
+  generate_linetypes <- function(levels) {
+    base <- c(
+      "solid", "dashed", "dotdash", "dotted",
+      "11", "44", "13", "3311", "F2", "1248", "8899",
+      "22FF", "4488", "F0F0", "1188", "3344", "77", "FF"
+    )
+    out <- rep(base, length.out = length(levels))
+    names(out) <- levels
+    out
+  }
+
+  generate_shapes <- function(levels) {
+    base <- c(16, 17, 15, 3, 7, 8, 4, 1)
+    out <- rep(base, length.out = length(levels))
+    names(out) <- levels
+    out
+  }
+
+  # ---------------------------------------------------------------------------
+  # 1. Filtering
   # ---------------------------------------------------------------------------
   if (!is.null(filter_expr)) {
     data <- dplyr::filter(data, !!rlang::parse_expr(filter_expr))
   }
 
   # ---------------------------------------------------------------------------
-  # 2. Interpret user intent
+  # 2. Normalize directives
   # ---------------------------------------------------------------------------
-  disable_color <- identical(color_by, "none")
-  disable_shape <- identical(shape_by, "none")
-  disable_facet <- identical(facet_by, "none")
-
-  normalize <- function(x) {
-    if (is.null(x) || identical(x, "none")) return(NULL)
-    x
-  }
+  normalize <- function(x) if (is.null(x) || identical(x, "none")) NULL else x
 
   color_by <- normalize(color_by)
   shape_by <- normalize(shape_by)
   facet_by <- normalize(facet_by)
 
-  # ---------------------------------------------------------------------------
-  # 3. Validate aesthetic variables
-  # ---------------------------------------------------------------------------
   exists_var <- function(v) !is.null(v) && v %in% names(data)
 
   if (!exists_var(color_by)) color_by <- NULL
   if (!exists_var(shape_by)) shape_by <- NULL
 
-  # shape aesthetics require factor levels
-  if (!is.null(shape_by)) {
-    data[[shape_by]] <- as.factor(data[[shape_by]])
-  }
+  # shape_by requires factor levels
+  if (!is.null(shape_by)) data[[shape_by]] <- as.factor(data[[shape_by]])
 
   # ---------------------------------------------------------------------------
-  # 4. Resolve colour palette
+  # 3. Palette resolution
   # ---------------------------------------------------------------------------
   if (is.null(palette)) {
     palette_values <- grDevices::palette()
   } else if (length(palette) == 1 &&
              palette %in% rownames(RColorBrewer::brewer.pal.info)) {
+
     palette_values <- RColorBrewer::brewer.pal(
       RColorBrewer::brewer.pal.info[palette, "maxcolors"],
       palette
     )
+
   } else {
     palette_values <- palette
   }
 
   # ---------------------------------------------------------------------------
-  # 5. Core aesthetic mapping
+  # 4. Base aesthetics
   # ---------------------------------------------------------------------------
   aes_map <- list(
     x     = quote(Delta_Effect),
     y     = quote(Delta_Cost),
     group = quote(group_uid)
   )
-  if (!is.null(color_by)) aes_map$colour <- rlang::sym(color_by)
-  if (!is.null(shape_by)) aes_map$shape  <- rlang::sym(shape_by)
+
+  if (!is.null(color_by))
+    aes_map$colour <- rlang::sym(color_by)
+
+  # IMPORTANT: do NOT attach shape or linetype here
+  # Those are added by the calling plotting functions.
 
   # ---------------------------------------------------------------------------
-  # 6. Initialize base plot
+  # 5. Base ggplot
   # ---------------------------------------------------------------------------
   p <- ggplot2::ggplot(data, do.call(ggplot2::aes, aes_map)) +
     theme_base +
@@ -134,11 +130,12 @@ ce_plot_base <- function(data,
     )
 
   # ---------------------------------------------------------------------------
-  # 7. Faceting (explicit directive only)
+  # 6. Facets
   # ---------------------------------------------------------------------------
   if (!is.null(facet_by)) {
 
     if (facet_by == "subgroup") {
+
       p <- p +
         ggplot2::facet_grid(
           rows   = ggplot2::vars(subgroup_level),
@@ -158,20 +155,37 @@ ce_plot_base <- function(data,
   }
 
   # ---------------------------------------------------------------------------
-  # 8. Configure legend visibility
+  # 7. Legend visibility (default: hide if inactive)
   # ---------------------------------------------------------------------------
-  if (is.null(color_by)) p <- p + ggplot2::guides(colour = "none")
-  if (is.null(shape_by)) p <- p + ggplot2::guides(shape  = "none")
+  if (is.null(color_by))
+    p <- p + ggplot2::guides(colour = "none")
+
+  if (is.null(shape_by))
+    p <- p + ggplot2::guides(shape  = "none", linetype = "none")
 
   # ---------------------------------------------------------------------------
-  # 9. Output
+  # 8. Shape and linetype values
+  # ---------------------------------------------------------------------------
+  shape_values    <- NULL
+  linetype_values <- NULL
+
+  if (!is.null(shape_by)) {
+    levels_shape     <- sort(unique(data[[shape_by]]))
+    shape_values     <- generate_shapes(levels_shape)
+    linetype_values  <- generate_linetypes(levels_shape)
+  }
+
+  # ---------------------------------------------------------------------------
+  # 9. Output bundle
   # ---------------------------------------------------------------------------
   list(
-    plot          = p,
-    data          = data,
-    color_var     = color_by,
-    shape_var     = shape_by,
-    palette_values = palette_values,
-    group_var     = "group_uid"
+    plot            = p,
+    data            = data,
+    color_var       = color_by,
+    shape_var       = shape_by,
+    linetype_values = linetype_values,
+    shape_values    = shape_values,
+    palette_values  = palette_values,
+    group_var       = "group_uid"
   )
 }
