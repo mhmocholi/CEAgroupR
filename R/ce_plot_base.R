@@ -1,32 +1,47 @@
-#' Internal layout constructor for all cost-effectiveness visualizations
+#' Internal Layout Constructor for Cost-Effectiveness Visualizations
 #'
-#' Provides the unified aesthetic and layout engine used across all CEAgroupR
-#' graphical functions. It standardizes colour mapping, optional shape mapping,
-#' faceting, palette resolution, legend visibility, and returns unified sets of
-#' shapes/linetypes for use by downstream plotting functions.
+#' Provides the unified aesthetic and layout engine used across all
+#' CEAgroupR graphical functions. This internal utility ensures consistent
+#' handling of colour mapping, optional shape/linetype mapping, faceting,
+#' palette resolution, and legend behaviour. It returns an initialized
+#' \code{ggplot2} object along with all internally resolved aesthetic
+#' components needed by downstream plotting functions.
 #'
-#' This function does *not* apply any automatic defaults for `color_by`,
-#' `shape_by`, or `facet_by`. Calling functions must supply these explicitly.
+#' The function does not apply defaults for \code{color_by},
+#' \code{shape_by} or \code{facet_by}. Calling functions must supply these
+#' explicitly to maintain transparency and reproducibility of aesthetic
+#' mappings.
 #'
-#' @param data A tibble produced by `combine_icers_results()`.
-#' @param color_by Character column mapped to colour, or `"none"`.
-#' @param shape_by Character column mapped to shape/linetype, or `"none"`.
-#' @param facet_by Faceting directive or `"none"`.
-#' @param filter_expr Optional tidyverse-style filter expression.
-#' @param facet_scales Faceting scale behaviour.
-#' @param palette Named vector or Brewer palette name.
-#' @param theme_base ggplot2 theme applied to the base plot.
-#' @param auto_layout Ignored; retained for backward compatibility.
+#' @param data A tibble produced by \code{combine_icers_results}.
+#' @param color_by Character string giving the variable mapped to colour,
+#'   or \code{"none"} to disable colour mapping.
+#' @param shape_by Character string giving the variable mapped to point
+#'   shape and linetype, or \code{"none"} to disable shape/linetype mapping.
+#' @param facet_by Character string defining the faceting directive
+#'   (e.g., \code{"dataset"}, \code{"comparison"}, \code{"subgroup"},
+#'   \code{"subgroup_var"}, \code{"subgroup_level"}). Use \code{"none"} to
+#'   disable faceting.
+#' @param filter_expr Optional character string containing a tidyverse-style
+#'   filter expression applied to \code{data}.
+#' @param facet_scales Value passed to \code{ggplot2} facet functions
+#'   (default: \code{"fixed"}).
+#' @param palette A named vector of colours or a palette name recognized by
+#'   \code{RColorBrewer}. Defaults to \code{"Dark2"}.
+#' @param theme_base A \code{ggplot2} theme applied to the base plot.
+#'   Defaults to \code{ggplot2::theme_bw()}.
+#' @param auto_layout Ignored. Retained for backward compatibility.
 #'
-#' @return A list with components:
-#'   * `plot` – initialized ggplot object
-#'   * `data` – filtered data
-#'   * `color_var` – resolved colour aesthetic
-#'   * `shape_var` – resolved variable for shape/linetype
-#'   * `linetype_values` – named vector of valid linetype patterns (if applicable)
-#'   * `shape_values` – named vector of point shapes (if applicable)
-#'   * `palette_values` – colour palette values
-#'   * `group_var` – internal grouping variable
+#' @return A list containing:
+#' \itemize{
+#'   \item \code{plot}: Initialized \code{ggplot} object.
+#'   \item \code{data}: Filtered input data.
+#'   \item \code{color_var}: Resolved colour aesthetic variable.
+#'   \item \code{shape_var}: Resolved shape/linetype variable.
+#'   \item \code{linetype_values}: Named vector of linetype patterns.
+#'   \item \code{shape_values}: Named vector of point shapes.
+#'   \item \code{palette_values}: Resolved colour palette.
+#'   \item \code{group_var}: Internal grouping variable used for layers.
+#' }
 #'
 #' @noRd
 ce_plot_base <- function(
@@ -36,7 +51,7 @@ ce_plot_base <- function(
     facet_by      = NULL,
     filter_expr   = NULL,
     facet_scales  = "fixed",
-    palette       = "Set2",
+    palette       = "Dark2",
     theme_base    = ggplot2::theme_bw(),
     auto_layout   = TRUE
 ) {
@@ -72,7 +87,9 @@ ce_plot_base <- function(
   # ---------------------------------------------------------------------------
   # 2. Normalize directives
   # ---------------------------------------------------------------------------
-  normalize <- function(x) if (is.null(x) || identical(x, "none")) NULL else x
+  normalize <- function(x) {
+    if (is.null(x) || identical(x, "none")) NULL else x
+  }
 
   color_by <- normalize(color_by)
   shape_by <- normalize(shape_by)
@@ -84,15 +101,21 @@ ce_plot_base <- function(
   if (!exists_var(shape_by)) shape_by <- NULL
 
   # shape_by requires factor levels
-  if (!is.null(shape_by)) data[[shape_by]] <- as.factor(data[[shape_by]])
+  if (!is.null(shape_by)) {
+    data[[shape_by]] <- as.factor(data[[shape_by]])
+  }
 
   # ---------------------------------------------------------------------------
   # 3. Palette resolution
   # ---------------------------------------------------------------------------
   if (is.null(palette)) {
+
     palette_values <- grDevices::palette()
-  } else if (length(palette) == 1 &&
-             palette %in% rownames(RColorBrewer::brewer.pal.info)) {
+
+  } else if (
+    length(palette) == 1 &&
+    palette %in% rownames(RColorBrewer::brewer.pal.info)
+  ) {
 
     palette_values <- RColorBrewer::brewer.pal(
       RColorBrewer::brewer.pal.info[palette, "maxcolors"],
@@ -112,11 +135,11 @@ ce_plot_base <- function(
     group = quote(group_uid)
   )
 
-  if (!is.null(color_by))
+  if (!is.null(color_by)) {
     aes_map$colour <- rlang::sym(color_by)
+  }
 
-  # IMPORTANT: do NOT attach shape or linetype here
-  # Those are added by the calling plotting functions.
+  # Shape and linetype mapping are added by calling functions only.
 
   # ---------------------------------------------------------------------------
   # 5. Base ggplot
@@ -143,8 +166,10 @@ ce_plot_base <- function(
           scales = facet_scales
         )
 
-    } else if (facet_by %in% c("dataset","comparison",
-                               "subgroup_var","subgroup_level")) {
+    } else if (facet_by %in% c(
+      "dataset", "comparison",
+      "subgroup_var", "subgroup_level"
+    )) {
 
       p <- p +
         ggplot2::facet_wrap(
@@ -155,13 +180,15 @@ ce_plot_base <- function(
   }
 
   # ---------------------------------------------------------------------------
-  # 7. Legend visibility (default: hide if inactive)
+  # 7. Legend visibility (hide if inactive)
   # ---------------------------------------------------------------------------
-  if (is.null(color_by))
+  if (is.null(color_by)) {
     p <- p + ggplot2::guides(colour = "none")
+  }
 
-  if (is.null(shape_by))
-    p <- p + ggplot2::guides(shape  = "none", linetype = "none")
+  if (is.null(shape_by)) {
+    p <- p + ggplot2::guides(shape = "none", linetype = "none")
+  }
 
   # ---------------------------------------------------------------------------
   # 8. Shape and linetype values
@@ -170,9 +197,9 @@ ce_plot_base <- function(
   linetype_values <- NULL
 
   if (!is.null(shape_by)) {
-    levels_shape     <- sort(unique(data[[shape_by]]))
-    shape_values     <- generate_shapes(levels_shape)
-    linetype_values  <- generate_linetypes(levels_shape)
+    lvls <- sort(unique(data[[shape_by]]))
+    shape_values    <- generate_shapes(lvls)
+    linetype_values <- generate_linetypes(lvls)
   }
 
   # ---------------------------------------------------------------------------

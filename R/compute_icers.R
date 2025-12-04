@@ -1,29 +1,61 @@
-#' Compute Incremental Cost-Effectiveness Ratios (ICERs) using Nonparametric Bootstrap
+#' Compute Incremental Cost-Effectiveness Ratios (ICERs) Using Nonparametric Bootstrap
 #'
-#' Performs nonparametric bootstrap resampling to estimate incremental cost,
-#' incremental effectiveness, ICER, and Net Monetary Benefit (NMB) between one
-#' reference strategy and one or more alternative strategies.
+#' Implements a nonparametric bootstrap procedure to estimate incremental cost,
+#' incremental effectiveness, the Incremental Cost-Effectiveness Ratio (ICER),
+#' and Net Monetary Benefit (NMB) for one reference strategy compared with one
+#' or more alternative strategies. The function supports multi-strategy,
+#' multi-dataset and subgroup-based analyses under a unified analytical
+#' framework.
 #'
-#' Subgroup variables are internally normalized to factors to ensure complete
-#' structural consistency across all datasets and subgroup levels.
-#'   - Numeric/Integer subgroups are converted to ordered factors.
-#'   - Character subgroups are converted to unordered factors preserving the
-#'     observed level order.
+#' The function automatically normalizes subgroup variables:
+#' \itemize{
+#'   \item Numeric or integer subgroups are converted to ordered factors.
+#'   \item Character subgroups are converted to unordered factors preserving
+#'         their observed order.
+#' }
 #'
-#' @param data Data frame or list of data frames.
-#' @param group Strategy variable name.
-#' @param cost Cost variable name.
-#' @param effect Effectiveness variable name.
-#' @param R Number of bootstrap replications.
-#' @param lambda Numeric WTP threshold(s).
-#' @param ci_type Type of CI ("bca", "perc"...).
-#' @param subgroup_vars Optional subgroup variables (character vector).
-#' @param seed Optional seed for reproducibility.
-#' @param verbose Logical. Show progress bars and messages.
-#' @param ref_group Reference strategy.
-#' @param alt_groups Vector of alternative strategies (optional).
+#' When multiple datasets are supplied (as a named or unnamed list), the
+#' bootstrap analysis is applied to each dataset independently. Internal
+#' S3 objects store both overall and subgroup results in a structured form
+#' used by downstream summarization and plotting functions.
 #'
-#' @return A \code{cea_results_list} object containing all analyses.
+#' @param data A data frame or a list of data frames. Each data frame must
+#'   contain the variables specified in \code{group}, \code{cost}, and
+#'   \code{effect}.
+#' @param group Character string specifying the strategy variable.
+#' @param cost Character string specifying the cost variable.
+#' @param effect Character string specifying the effectiveness variable.
+#' @param R Integer. Number of bootstrap replications (default: 1000).
+#' @param lambda Numeric vector of willingness-to-pay (WTP) thresholds for
+#'   computing Net Monetary Benefit (NMB).
+#' @param ci_type Character string specifying the type of confidence interval
+#'   to be computed using \code{boot::boot.ci} (e.g., "bca", "perc", "basic",
+#'   "norm").
+#' @param subgroup_vars Optional character vector with the names of subgroup
+#'   variables. Each subgroup is analyzed independently.
+#' @param seed Optional integer seed for reproducibility. If \code{NULL},
+#'   a seed is generated automatically.
+#' @param verbose Logical. If \code{TRUE}, progress bars and messages are
+#'   displayed during the bootstrap procedure.
+#' @param ref_group Character string specifying the reference strategy.
+#'   This argument is mandatory.
+#' @param alt_groups Optional character vector specifying the alternative
+#'   strategies. If \code{NULL}, all non-reference strategies observed
+#'   in the data are used.
+#'
+#' @return
+#' A \code{cea_results_list} S3 object containing:
+#' \itemize{
+#'   \item \code{[dataset_name]$Overall}: ICER analyses for the full dataset.
+#'   \item \code{[dataset_name]$Subgroups}: ICER analyses for each subgroup.
+#'   \item \code{combined_replicates}: Combined bootstrap samples across all
+#'         datasets and comparisons.
+#'   \item \code{summary_stats}: Summary statistics for costs, effects,
+#'         incremental values and NMB.
+#'   \item \code{settings}: List of analytical settings used in the run.
+#' }
+#' @importFrom stats sd setNames
+#' @importFrom utils txtProgressBar setTxtProgressBar
 #' @export
 compute_icers <- function(data, group, cost, effect,
                           R = 1000, lambda = 25000,

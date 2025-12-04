@@ -10,7 +10,7 @@
 #' @param ... Additional arguments passed to the corresponding plotting method.
 #'
 #' @return A ggplot object.
-#' @export
+#' @rawNamespace export(plot.cea_results_list)
 plot.cea_results_list <- function(x, type = "icers", ...) {
   type <- match.arg(type, c("icers", "ceacs", "evpis", "marginals"))
 

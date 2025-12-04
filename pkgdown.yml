@@ -1,0 +1,57 @@
+template:
+  bootstrap: 5
+  bootswatch: flatly
+
+navbar:
+  title: "CEAgroupR"
+  type: default
+  structure:
+    left:
+      - text: "Home"
+        href: index.html
+      - text: "Get Started"
+        href: articles/CEAgroupR.html
+      - text: "Reference"
+        href: reference/index.html
+      - text: "Vignettes"
+        href: articles/index.html
+    right:
+      - icon: fa-github
+        href: https://github.com/mhmocholi/CEAgroupR
+
+articles:
+  - title: "Getting Started"
+    contents:
+      - CEAgroupR
+
+home:
+  title: "CEAgroupR"
+  description: "Multigroup Cost-Effectiveness Analysis in R"
+
+reference:
+  - title: "Core Analytical Functions"
+    contents:
+      - compute_icers
+      - combine_icers_results
+      - summarize_cea_data
+
+  - title: "Visualization Functions"
+    contents:
+      - plot.icers
+      - plot.ceacs
+      - plot.evpis
+      - plot.marginals
+
+  - title: "Interactive Dashboard"
+    contents:
+      - CEAgroupRui
+
+  - title: "Included Datasets"
+    contents:
+      - cua_base
+      - cua_base_discounted
+      - cua_multi
+      - cua_multi_discounted
+
+news:
+  one_page: true

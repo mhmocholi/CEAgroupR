@@ -2,14 +2,15 @@
 % Please edit documentation in R/print.cea_results.R
 \name{print.cea_results}
 \alias{print.cea_results}
-\title{Print method for cea_results objects}
+\title{Print Method for \code{cea_results} Objects}
 \usage{
 \method{print}{cea_results}(x, digits = 3, ...)
 }
 \arguments{
 \item{x}{An object of class \code{cea_results}.}
 
-\item{digits}{Integer number of decimal places to display (default = 3).}
+\item{digits}{Integer specifying the number of decimal places to display.
+Default is 3.}
 
 \item{...}{Additional arguments (unused).}
 }
@@ -17,12 +18,14 @@
 Invisibly returns \code{x}.
 }
 \description{
-Displays a structured overview of all cost-effectiveness comparisons
-(overall and subgroup-specific) stored within a \code{cea_results} object.
+Displays a structured overview of cost-effectiveness bootstrap results
+stored within a \code{cea_results} object. The output includes both
+overall comparisons and subgroup-specific results, when applicable.
 }
 \details{
-The reference strategy is obtained from the shared analysis environment
-(\code{settings_env}) created by \code{compute_icers()}. Comparison labels are
-simplified to the name of the alternative strategy only, following the
-standardized naming convention used throughout the analytical layer.
+The reference strategy is obtained from the internal analysis settings
+stored in each underlying comparison object (as attached by
+\code{compute_icers}). Comparison labels correspond to the name of the
+alternative strategy only, following the standardized conventions used
+across the analytical layer.
 }

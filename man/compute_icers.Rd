@@ -2,7 +2,7 @@
 % Please edit documentation in R/compute_icers.R
 \name{compute_icers}
 \alias{compute_icers}
-\title{Compute Incremental Cost-Effectiveness Ratios (ICERs) using Nonparametric Bootstrap}
+\title{Compute Incremental Cost-Effectiveness Ratios (ICERs) Using Nonparametric Bootstrap}
 \usage{
 compute_icers(
   data,
@@ -20,44 +20,71 @@ compute_icers(
 )
 }
 \arguments{
-\item{data}{Data frame or list of data frames.}
+\item{data}{A data frame or a list of data frames. Each data frame must
+contain the variables specified in \code{group}, \code{cost}, and
+\code{effect}.}
 
-\item{group}{Strategy variable name.}
+\item{group}{Character string specifying the strategy variable.}
 
-\item{cost}{Cost variable name.}
+\item{cost}{Character string specifying the cost variable.}
 
-\item{effect}{Effectiveness variable name.}
+\item{effect}{Character string specifying the effectiveness variable.}
 
-\item{R}{Number of bootstrap replications.}
+\item{R}{Integer. Number of bootstrap replications (default: 1000).}
 
-\item{lambda}{Numeric WTP threshold(s).}
+\item{lambda}{Numeric vector of willingness-to-pay (WTP) thresholds for
+computing Net Monetary Benefit (NMB).}
 
-\item{ci_type}{Type of CI ("bca", "perc"...).}
+\item{ci_type}{Character string specifying the type of confidence interval
+to be computed using \code{boot::boot.ci} (e.g., "bca", "perc", "basic",
+"norm").}
 
-\item{subgroup_vars}{Optional subgroup variables (character vector).}
+\item{subgroup_vars}{Optional character vector with the names of subgroup
+variables. Each subgroup is analyzed independently.}
 
-\item{seed}{Optional seed for reproducibility.}
+\item{seed}{Optional integer seed for reproducibility. If \code{NULL},
+a seed is generated automatically.}
 
-\item{verbose}{Logical. Show progress bars and messages.}
+\item{verbose}{Logical. If \code{TRUE}, progress bars and messages are
+displayed during the bootstrap procedure.}
 
-\item{ref_group}{Reference strategy.}
+\item{ref_group}{Character string specifying the reference strategy.
+This argument is mandatory.}
 
-\item{alt_groups}{Vector of alternative strategies (optional).}
+\item{alt_groups}{Optional character vector specifying the alternative
+strategies. If \code{NULL}, all non-reference strategies observed
+in the data are used.}
 }
 \value{
-A \code{cea_results_list} object containing all analyses.
+A \code{cea_results_list} S3 object containing:
+\itemize{
+\item \code{[dataset_name]$Overall}: ICER analyses for the full dataset.
+\item \code{[dataset_name]$Subgroups}: ICER analyses for each subgroup.
+\item \code{combined_replicates}: Combined bootstrap samples across all
+datasets and comparisons.
+\item \code{summary_stats}: Summary statistics for costs, effects,
+incremental values and NMB.
+\item \code{settings}: List of analytical settings used in the run.
+}
 }
 \description{
-Performs nonparametric bootstrap resampling to estimate incremental cost,
-incremental effectiveness, ICER, and Net Monetary Benefit (NMB) between one
-reference strategy and one or more alternative strategies.
+Implements a nonparametric bootstrap procedure to estimate incremental cost,
+incremental effectiveness, the Incremental Cost-Effectiveness Ratio (ICER),
+and Net Monetary Benefit (NMB) for one reference strategy compared with one
+or more alternative strategies. The function supports multi-strategy,
+multi-dataset and subgroup-based analyses under a unified analytical
+framework.
 }
 \details{
-Subgroup variables are internally normalized to factors to ensure complete
-structural consistency across all datasets and subgroup levels.
+The function automatically normalizes subgroup variables:
 \itemize{
-\item Numeric/Integer subgroups are converted to ordered factors.
-\item Character subgroups are converted to unordered factors preserving the
-observed level order.
+\item Numeric or integer subgroups are converted to ordered factors.
+\item Character subgroups are converted to unordered factors preserving
+their observed order.
 }
+
+When multiple datasets are supplied (as a named or unnamed list), the
+bootstrap analysis is applied to each dataset independently. Internal
+S3 objects store both overall and subgroup results in a structured form
+used by downstream summarization and plotting functions.
 }

@@ -2,11 +2,20 @@
 % Please edit documentation in R/CEAgroupRui.R
 \name{CEAgroupRui}
 \alias{CEAgroupRui}
-\title{Launch interactive CEAgroupR Shiny interface (refined classic UI)}
+\title{Launch Interactive CEAgroupR Dashboard}
 \usage{
 CEAgroupRui()
 }
 \description{
-Interactive Shiny application for performing and visualizing
-multistrategy cost-effectiveness analyses using the CEAgroupR package.
+Provides an interactive Shiny dashboard for performing multistrategy,
+multidataset and subgroup-based cost-effectiveness analyses using the
+CEAgroupR package. The interface allows users to upload datasets, configure
+analysis options, execute full bootstrap workflows, inspect summary tables,
+and visualize results through ICER planes, CEACs, EVPI curves and marginal
+distributions. All plots rely on the unified graphical engine
+\\code{ce_plot_base}, ensuring consistent aesthetics across the application.
+}
+\details{
+The dashboard uses a modern Bootstrap/bslib layout and supports PNG and PDF
+exports of all visualizations. User-specified aesthetics override defaults.
 }

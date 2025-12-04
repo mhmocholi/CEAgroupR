@@ -1,47 +1,56 @@
-#' Print method for cea_results objects
+#' Print Method for \code{cea_results} Objects
 #'
-#' Displays a structured overview of all cost-effectiveness comparisons
-#' (overall and subgroup-specific) stored within a \code{cea_results} object.
+#' Displays a structured overview of cost-effectiveness bootstrap results
+#' stored within a \code{cea_results} object. The output includes both
+#' overall comparisons and subgroup-specific results, when applicable.
 #'
-#' The reference strategy is obtained from the shared analysis environment
-#' (`settings_env`) created by \code{compute_icers()}. Comparison labels are
-#' simplified to the name of the alternative strategy only, following the
-#' standardized naming convention used throughout the analytical layer.
+#' The reference strategy is obtained from the internal analysis settings
+#' stored in each underlying comparison object (as attached by
+#' \code{compute_icers}). Comparison labels correspond to the name of the
+#' alternative strategy only, following the standardized conventions used
+#' across the analytical layer.
 #'
 #' @param x An object of class \code{cea_results}.
-#' @param digits Integer number of decimal places to display (default = 3).
+#' @param digits Integer specifying the number of decimal places to display.
+#'   Default is 3.
 #' @param ... Additional arguments (unused).
 #'
 #' @return Invisibly returns \code{x}.
 #' @export
 print.cea_results <- function(x, digits = 3, ...) {
 
-  # ---- Retrieve reference strategy from settings ----
-  ref_group <- NA
-  if (!is.null(attr(x$Overall[[1]], "settings_env"))) {
+  # Retrieve reference strategy -------------------------------------------------
+  ref_group <- NA_character_
+
+  if (!is.null(x$Overall) &&
+      length(x$Overall) > 0 &&
+      !is.null(attr(x$Overall[[1]], "settings_env"))) {
+
     ref_group <- attr(x$Overall[[1]], "settings_env")$ref_group
   }
 
+  # Header ----------------------------------------------------------------------
   cat("------------------------------------------------------------\n")
   cat(" Cost-Effectiveness Analysis Results\n")
   cat("------------------------------------------------------------\n")
 
   cat("Reference strategy: ",
-      ifelse(is.na(ref_group), "Not available", ref_group), "\n\n", sep = "")
+      if (is.na(ref_group)) "Not available" else ref_group,
+      "\n\n", sep = "")
 
-  # ---- Helper to summarize a cea_base object ----
+  # Helper to summarize a single cea_base object -------------------------------
   summarize_one <- function(base_obj, level = "Overall", subgroup = "") {
 
-    if (is.null(base_obj$bootstrap_samples)) return(NULL)
+    if (is.null(base_obj$bootstrap_samples))
+      return(NULL)
 
     means <- colMeans(base_obj$bootstrap_samples, na.rm = TRUE)
-    ci_list <- base_obj$boot_ci
-    lower <- sapply(ci_list, function(ci) ci[1])
-    upper <- sapply(ci_list, function(ci) ci[2])
+    lower <- sapply(base_obj$boot_ci, function(ci) ci[1])
+    upper <- sapply(base_obj$boot_ci, function(ci) ci[2])
 
     tibble::tibble(
-      Level     = level,
-      Subgroup  = subgroup,
+      Level      = level,
+      Subgroup   = subgroup,
       Comparison = base_obj$comparison,
       Parameter  = names(means),
       Mean       = round(means, digits),
@@ -50,36 +59,42 @@ print.cea_results <- function(x, digits = 3, ...) {
     )
   }
 
-  res_all <- list()
+  results_list <- list()
 
-  # ---- Overall results ----
+  # Overall results -------------------------------------------------------------
   if (!is.null(x$Overall)) {
 
     if (inherits(x$Overall, "cea_base")) {
-      res_all[[length(res_all) + 1]] <- summarize_one(x$Overall)
-    }
 
-    if (inherits(x$Overall, "cea_multicomparison")) {
+      results_list[[length(results_list) + 1]] <-
+        summarize_one(x$Overall)
+
+    } else if (inherits(x$Overall, "cea_multicomparison")) {
+
       for (nm in names(x$Overall)) {
-        res_all[[length(res_all) + 1]] <- summarize_one(x$Overall[[nm]])
+        results_list[[length(results_list) + 1]] <-
+          summarize_one(x$Overall[[nm]])
       }
     }
   }
 
-  # ---- Subgroup results ----
+  # Subgroup results ------------------------------------------------------------
   if (!is.null(x$Subgroups) && length(x$Subgroups) > 0) {
+
     for (var in names(x$Subgroups)) {
       for (lvl in names(x$Subgroups[[var]])) {
+
         obj <- x$Subgroups[[var]][[lvl]]
 
         if (inherits(obj, "cea_base")) {
-          res_all[[length(res_all) + 1]] <-
-            summarize_one(obj, level = var, subgroup = lvl)
-        }
 
-        if (inherits(obj, "cea_multicomparison")) {
+          results_list[[length(results_list) + 1]] <-
+            summarize_one(obj, level = var, subgroup = lvl)
+
+        } else if (inherits(obj, "cea_multicomparison")) {
+
           for (nm in names(obj)) {
-            res_all[[length(res_all) + 1]] <-
+            results_list[[length(results_list) + 1]] <-
               summarize_one(obj[[nm]], level = var, subgroup = lvl)
           }
         }
@@ -87,29 +102,31 @@ print.cea_results <- function(x, digits = 3, ...) {
     }
   }
 
-  # ---- Consolidate printed table ----
-  res_table <- dplyr::bind_rows(res_all)
+  # Combine results -------------------------------------------------------------
+  results_tbl <- dplyr::bind_rows(results_list)
 
-  if (nrow(res_table) == 0) {
+  if (nrow(results_tbl) == 0) {
     cat("No bootstrap summary data available.\n")
     return(invisible(x))
   }
 
-  # Numeric formatting
-  num_cols <- sapply(res_table, is.numeric)
-  res_table[num_cols] <- lapply(res_table[num_cols], function(col)
-    format(round(col, digits),
-           nsmall = digits,
-           justify = "right",
-           scientific = FALSE)
-  )
+  # Formatting ------------------------------------------------------------------
+  num_cols <- sapply(results_tbl, is.numeric)
 
-  # Character spacing
-  res_table[!num_cols] <- lapply(res_table[!num_cols], function(col)
+  results_tbl[num_cols] <- lapply(results_tbl[num_cols], function(col) {
+    format(
+      round(col, digits),
+      nsmall = digits,
+      justify = "right",
+      scientific = FALSE
+    )
+  })
+
+  results_tbl[!num_cols] <- lapply(results_tbl[!num_cols], function(col) {
     format(col, justify = "left")
-  )
+  })
 
-  print.data.frame(res_table, row.names = FALSE, right = TRUE)
+  print.data.frame(results_tbl, row.names = FALSE, right = TRUE)
   cat("\n")
 
   invisible(x)

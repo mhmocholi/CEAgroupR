@@ -18,7 +18,7 @@ Produces three compact tables per dataset:
 \enumerate{
 \item Sample sizes
 \item Mean and SD of costs and effects
-\item Incremental outcomes (ΔCost, ΔEffect, ICER, NMB)
+\item Incremental outcomes (Delta Cost, Delta Effect, ICER, NMB)
 }
 }
 \details{

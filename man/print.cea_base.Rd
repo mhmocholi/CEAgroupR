@@ -2,36 +2,30 @@
 % Please edit documentation in R/print.cea_base.R
 \name{print.cea_base}
 \alias{print.cea_base}
-\title{Print method for cea_base objects}
+\title{Print Method for \code{cea_base} Objects}
 \usage{
 \method{print}{cea_base}(x, digits = 3, ...)
 }
 \arguments{
 \item{x}{An object of class \code{cea_base}.}
 
-\item{digits}{Integer, number of decimal places to display (default = 3).}
+\item{digits}{Integer indicating the number of decimal places to display.
+Default is 3.}
 
 \item{...}{Additional arguments (unused).}
 }
 \value{
-Invisibly returns the input object \code{x}.
+Invisibly returns \code{x}.
 }
 \description{
-Displays bootstrap summary statistics for a single cost-effectiveness
-comparison between the reference strategy and one alternative strategy.
+Displays a formatted summary of bootstrap results for a single
+cost-effectiveness comparison between the reference strategy and one
+alternative strategy. The output includes original estimates,
+bootstrap means, bias, and percentile-based confidence intervals when
+available.
 }
 \details{
-The comparison label contains only the name of the alternative strategy
-for clarity. The reference strategy is retrieved from a shared analysis
-environment (\code{settings_env}) attached to each comparison object by
-\code{compute_icers()}, avoiding duplication of metadata while ensuring
-consistent reporting across the analytical layer.
-
-Reported values include:
-\itemize{
-\item Original point estimates
-\item Bootstrap means
-\item Bias
-\item 95\% confidence intervals (when available)
-}
+The reference strategy is retrieved from the internal analysis settings
+attached to the object by \code{compute_icers}. The alternative strategy
+corresponds to the comparison stored in the \code{cea_base} object.
 }

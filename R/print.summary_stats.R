@@ -3,7 +3,7 @@
 #' Produces three compact tables per dataset:
 #'   1) Sample sizes
 #'   2) Mean and SD of costs and effects
-#'   3) Incremental outcomes (ΔCost, ΔEffect, ICER, NMB)
+#'   3) Incremental outcomes (Delta Cost, Delta Effect, ICER, NMB)
 #'
 #' Each row corresponds to one combination:
 #'   subgroup_var × subgroup_level × comparison
@@ -21,37 +21,32 @@ print.summary_stats <- function(x, digits = 3, ...) {
 
   df <- as.data.frame(x)
 
-  # Fill empty subgroup levels
+  # Replace missing subgroup levels
   if ("subgroup_level" %in% names(df))
     df$subgroup_level[is.na(df$subgroup_level)] <- "Overall"
 
   # Extract NMB columns
   nmb_cols <- grep("^NMB_", names(df), value = TRUE)
 
-  # ---- Robust reference group detection ----
-  .find_ref_group <- function() {
+  # ---- Safe ref_group detection (CRAN-friendly, knitting-safe) ----
+  .find_ref_group <- function(x) {
 
-    # 1) Try settings_env inside any cea_base within summary_stats source
-    envs <- sys.frames()
-    for (e in rev(envs)) {
-      objs <- ls(envir = e)
-      for (nm in objs) {
-        obj <- get(nm, envir = e)
-        if (inherits(obj, "cea_results_list")) {
-          return(obj$settings$ref_group)
-        }
-      }
+    # 1) If settings_env exists, use it directly
+    env <- attr(x, "settings_env")
+    if (!is.null(env) && !is.null(env$ref_group)) {
+      return(env$ref_group)
     }
 
-    # 2) As fallback, look for attached settings_env in attributes (if any)
-    if (!is.null(attr(x, "settings_env"))) {
-      return(attr(x, "settings_env")$ref_group)
+    # 2) If comparison column exists, inference is ambiguous → return NA safely
+    if ("comparison" %in% names(x)) {
+      return(NA_character_)
     }
 
-    return(NA)
+    # 3) Fallback
+    return(NA_character_)
   }
 
-  ref_group <- .find_ref_group()
+  ref_group <- .find_ref_group(x)
 
   # ---- List of datasets ----
   datasets <- unique(df$dataset)
@@ -60,45 +55,45 @@ print.summary_stats <- function(x, digits = 3, ...) {
 
     df_ds <- df[df$dataset == ds, , drop = FALSE]
 
-    # ----------------------------------------------------------
+    # --------------------------------------------------------------------------
     # HEADER
-    # ----------------------------------------------------------
+    # --------------------------------------------------------------------------
     cat("Dataset: ", ds, "\n", sep = "")
-    cat("Reference group: ", ref_group, "\n", sep = "")
+    cat("Reference group: ",
+        if (is.na(ref_group)) "Not available" else ref_group, "\n", sep = "")
     cat("------------------------------------------------------------\n\n")
 
-    # ==========================================================
+    # ========================================================================
     # TABLE 1 — SAMPLE SIZES
-    # ==========================================================
+    # ========================================================================
     cat("SAMPLE SIZES\n")
     cat("------------------------------------------------------------\n")
 
     samp_cols <- c("subgroup_var","subgroup_level","comparison","n_ref","n_alt")
     samp_cols <- intersect(samp_cols, names(df_ds))
-
     samp <- df_ds[, samp_cols, drop = FALSE]
 
-    num_cols <- sapply(samp, is.numeric)
     int_cols <- intersect(c("n_ref","n_alt"), names(samp))
+    num_cols <- sapply(samp, is.numeric)
 
     samp <- lapply(names(samp), function(coln) {
       col <- samp[[coln]]
       if (coln %in% int_cols) {
-        return(format(as.integer(col), justify="right"))
+        format(as.integer(col), justify = "right")
       } else if (is.numeric(col)) {
-        return(format(round(col, digits), nsmall = digits, justify = "right"))
+        format(round(col, digits), nsmall = digits, justify = "right")
       } else {
-        return(format(col, justify = "left"))
+        format(col, justify = "left")
       }
     })
-
     samp <- as.data.frame(samp, col.names = samp_cols)
+
     print.data.frame(samp, row.names = FALSE, right = TRUE)
     cat("\n\n")
 
-    # ==========================================================
+    # ========================================================================
     # TABLE 2 — MEANS AND SD
-    # ==========================================================
+    # ========================================================================
     cat("MEANS AND SD (Costs and Effects)\n")
     cat("------------------------------------------------------------\n")
 
@@ -108,11 +103,9 @@ print.summary_stats <- function(x, digits = 3, ...) {
       "mean_eff_ref","sd_eff_ref","mean_eff_alt","sd_eff_alt"
     )
     desc_cols <- intersect(desc_cols, names(df_ds))
-
     desc <- df_ds[, desc_cols, drop = FALSE]
 
     num_cols <- sapply(desc, is.numeric)
-
     desc[num_cols] <- lapply(desc[num_cols], function(col)
       format(round(col, digits), nsmall = digits, justify = "right")
     )
@@ -121,9 +114,9 @@ print.summary_stats <- function(x, digits = 3, ...) {
     print.data.frame(desc, row.names = FALSE, right = TRUE)
     cat("\n\n")
 
-    # ==========================================================
+    # ========================================================================
     # TABLE 3 — INCREMENTAL OUTCOMES
-    # ==========================================================
+    # ========================================================================
     cat("INCREMENTAL OUTCOMES\n")
     cat("------------------------------------------------------------\n")
 
@@ -132,7 +125,6 @@ print.summary_stats <- function(x, digits = 3, ...) {
       "delta_cost","delta_effect","ICER", nmb_cols
     )
     inc_cols <- intersect(inc_cols, names(df_ds))
-
     inc <- df_ds[, inc_cols, drop = FALSE]
 
     num_cols <- sapply(inc, is.numeric)

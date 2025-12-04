@@ -7,29 +7,44 @@ Authors@R:
            email = "mhmocholi@unex.es",
            role = c("aut", "cre"),
            comment = c(ORCID = "0000-0001-6914-9282"))
-Description: Tools to perform incremental cost-effectiveness and cost-utility analyses with a focus on subgroup-level evaluations. The package provides functions to compute incremental cost-effectiveness ratios (ICERs), summarize outcomes, and generate cost-effectiveness/cost-utility plots across different subpopulations. It is designed to support reproducible economic evaluations and facilitate subgroup analyses in health economics research.
+Description: 
+    Tools to perform incremental cost-effectiveness and cost-utility analyses 
+    with explicit support for multi-strategy, multi-dataset and subgroup-based 
+    economic evaluations. The package provides functions for computing 
+    incremental cost-effectiveness ratios (ICERs), summarizing outcomes, 
+    and generating cost-effectiveness visualizations through a unified 
+    and configurable plotting engine. Designed to support reproducible 
+    subgroup analyses and multidimensional health economic evaluations.
 License: MIT + file LICENSE
 Encoding: UTF-8
-Depends: R (>= 4.1.0)
+Depends: 
+    R (>= 4.1.0)
 Imports:
     dplyr,
     ggplot2,
     tibble,
-    magrittr,
     MASS,
     boot,
     rlang,
-    colorspace,
     shiny,
-    shinyjs,
-    shinythemes,
+    bslib,
     DT,
     readxl,
-    rmarkdown,
-    knitr
+    colorspace,
+    RColorBrewer,
+    scales,
+    grDevices,
+    stats,
+    utils
 Suggests:
+    shinyjs,
+    shinythemes,
+    rmarkdown,
+    knitr,
+    pkgdown,
     testthat (>= 3.0.0)
+VignetteBuilder: knitr
 Config/testthat/edition: 3
+LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
-LazyData: true
