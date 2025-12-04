@@ -20,7 +20,6 @@ visualizations across all cost-effectiveness outputs.
   - CEACs  
   - EVPIs  
   - Marginal distributions
-- Interactive Shiny dashboard (`CEAgroupRui()`) for applied analyses.
 - CRAN-friendly modular design with reproducible workflows.
 
 ---
@@ -157,19 +156,6 @@ plot.icers(
 
 ---
 
-# Interactive dashboard
-
-CEAgroupR includes an interactive Shiny interface:
-
-```r
-CEAgroupRui()
-```
-
-This dashboard allows users to upload datasets, configure bootstrap settings,
-view summary statistics, generate ICER/CEAC/EVPI/Marginal plots interactively,
-and export graphics in PNG and PDF formats.
-
----
 
 # Documentation
 

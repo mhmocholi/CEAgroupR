@@ -8,8 +8,11 @@ output:
     theme: flatly
 vignette: >
   %\VignetteIndexEntry{Multigroup Cost-Effectiveness Analysis with CEAgroupR}
-  %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
 ```{r setup, include=FALSE}
@@ -25,15 +28,16 @@ multidimensional cost-effectiveness analyses in settings where economic
 evaluations must compare multiple strategies, across multiple datasets,
 and optionally across relevant subgroups.
 
-This vignette illustrates how to apply the package to *multigroup* analysis,
-where multiple datasets (e.g., base case and discounted scenario) are processed
-simultaneously, and visualized through a graphical engine providing a consistent
-set of aesthetics across all plots.
+This vignette illustrates how to apply the package to *multigroup*
+analysis, where multiple datasets (e.g., base case and discounted
+scenario) are processed simultaneously, and visualized through a
+graphical engine providing a consistent set of aesthetics across all
+plots.
 
 The examples in this vignette use two bundled datasets:
 
-- `cua_multi`  
-- `cua_multi_discounted`  
+-   `cua_multi`\
+-   `cua_multi_discounted`
 
 Both contain individual-level cost and effectiveness values for several
 intervention strategies.
@@ -42,11 +46,11 @@ intervention strategies.
 
 Each dataset includes:
 
-- `id`: individual identifier  
-- `group`: treatment strategy  
-- `cost_total`: total cost  
-- `effect`: effectiveness/QALYs  
-- subgroup variables such as `diabetes`, `HTA`, `n_comorbidities`  
+-   `id`: individual identifier\
+-   `group`: treatment strategy\
+-   `cost_total`: total cost\
+-   `effect`: effectiveness/QALYs\
+-   subgroup variables such as `diabetes`, `HTA`, `n_comorbidities`
 
 Let us inspect them:
 
@@ -57,7 +61,8 @@ glimpse(cua_multi_discounted)
 
 # Preparing multigroup input
 
-To run a multigroup analysis, the input must be a **named list** of datasets:
+To run a multigroup analysis, the input must be a **named list** of
+datasets:
 
 ```{r prepare-list}
 data_list <- list(
@@ -71,11 +76,11 @@ data_list <- list(
 The main function is `compute_icers()`, which performs bootstrap-based
 estimation of:
 
-- incremental cost  
-- incremental effect  
-- ICER  
-- Net Monetary Benefit (NMB)  
-- per dataset, per comparison, per subgroup  
+-   incremental cost\
+-   incremental effect\
+-   ICER\
+-   Net Monetary Benefit (NMB)\
+-   per dataset, per comparison, per subgroup
 
 We request subgroup analyses by `diabetes` and `HTA`.
 
@@ -96,7 +101,8 @@ res <- compute_icers(
 )
 ```
 
-The result is a `cea_results_list` containing analysis results for each dataset.
+The result is a `cea_results_list` containing analysis results for each
+dataset.
 
 ```{r print-results}
 res
@@ -104,17 +110,16 @@ res
 
 # Summary statistics
 
-Descriptive summaries (means, SDs, deltas, ICERs and NMBs) are available in:
+Descriptive summaries (means, SDs, deltas, ICERs and NMBs) are available
+in:
 
 ```{r summary-table, eval=FALSE}
 res$summary_stats
 ```
 
-
 ```{r summary-table-show}
 knitr::kable(as.data.frame(res$summary_stats))
 ```
-
 
 Formatted console output:
 
@@ -126,21 +131,21 @@ res$summary_stats
 
 CEAgroupR provides four main visualization functions:
 
-- `plot.icers()` – ICER plane  
-- `plot.ceacs()` – CEAC  
-- `plot.evpis()` – EVPI  
-- `plot.marginals()` – distributions of incremental outcomes  
+-   `plot.icers()` – ICER plane\
+-   `plot.ceacs()` – CEAC\
+-   `plot.evpis()` – EVPI\
+-   `plot.marginals()` – distributions of incremental outcomes
 
-All share a unified graphical engine (`ce_plot_base`) ensuring consistent
-colour, shape, grouping, faceting and palette behaviour.
+All share a unified graphical engine (`ce_plot_base`) ensuring
+consistent colour, shape, grouping, faceting and palette behaviour.
 
 Their aesthetics can be overridden by specifying:
 
-- `color_by`  
-- `shape_by`  
-- `facet_by`  
-- `filter_expr`  
-- `palette`  
+-   `color_by`\
+-   `shape_by`\
+-   `facet_by`\
+-   `filter_expr`\
+-   `palette`
 
 ## ICER Plane
 
@@ -241,13 +246,12 @@ plot.icers(
 
 # Reproducibility notes
 
-- Set a seed for deterministic bootstrap results.
-- Summary statistics and replicates can be exported for reporting.
-- In vignette examples, `R = 500` is used for performance.
+-   Set a seed for deterministic bootstrap results.
+-   Summary statistics and replicates can be exported for reporting.
+-   In vignette examples, `R = 500` is used for performance.
 
 # Session info
 
 ```{r session-info}
 sessionInfo()
 ```
-

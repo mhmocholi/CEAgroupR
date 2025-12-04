@@ -26,10 +26,6 @@ Imports:
     MASS,
     boot,
     rlang,
-    shiny,
-    bslib,
-    DT,
-    readxl,
     colorspace,
     RColorBrewer,
     scales,
@@ -37,8 +33,6 @@ Imports:
     stats,
     utils
 Suggests:
-    shinyjs,
-    shinythemes,
     rmarkdown,
     knitr,
     pkgdown,
