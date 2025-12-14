@@ -30,7 +30,7 @@ visualizations across all cost-effectiveness outputs.
 
 ```r
 # install.packages("remotes")
-remotes::install_github("TU_USUARIO/CEAgroupR")
+remotes::install_github("mhmocholi/CEAgroupR")
 ```
 
 ## Local development version

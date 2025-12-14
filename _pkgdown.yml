@@ -1,0 +1,80 @@
+template:
+  bootstrap: 5
+  bootswatch: flatly
+  includes:
+    in_header: |
+      <style>
+        .navbar-brand img,
+        .navbar-brand .img-fluid {
+          max-height: 100px !important;
+          height: auto !important;
+          width: auto !important;
+        }
+      </style>
+
+
+logo:
+  path: man/figures/logo.png
+  alt: "CEAgroupR logo"
+  width: 250
+
+navbar:
+  title: "CEAgroupR"
+  left:
+    - text: "Home"
+      href: index.html
+    - text: "Get Started"
+      href: articles/CEAgroupR.html
+    - text: "Reference"
+      href: reference/index.html
+    - text: "Vignettes"
+      href: articles/index.html
+  right:
+    - icon: fa-github
+      href: https://github.com/mhmocholi/CEAgroupR
+
+articles:
+  - title: "Getting Started"
+    contents:
+      - CEAgroupR
+
+  - title: "Analysis Modes"
+    contents:
+      - modes_overview
+      - modes_custom
+
+  - title: "Advanced Customization"
+    contents:
+      - advanced_ggplot_customization
+
+home:
+  title: "CEAgroupR"
+  description: "Multigroup Cost-Effectiveness Analysis in R"
+
+reference:
+  - title: "Core Analytical Functions"
+    contents:
+      - compute_icers
+      - combine_icers_results
+      - summarize_cea_data
+      - print.cea_base
+      - print.cea_results
+      - print.summary_stats
+
+  - title: "Visualization Functions"
+    contents:
+      - plot.icers
+      - plot.ceacs
+      - plot.evpis
+      - plot.marginals
+      - plot.cea_results_list
+
+  - title: "Included Datasets"
+    contents:
+      - cua_base
+      - cua_base_discounted
+      - cua_multi
+      - cua_multi_discounted
+
+news:
+  one_page: true
