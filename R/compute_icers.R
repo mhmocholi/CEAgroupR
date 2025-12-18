@@ -1,258 +1,190 @@
 #' Compute Incremental Cost-Effectiveness Ratios (ICERs) Using Nonparametric Bootstrap
 #'
 #' Implements a nonparametric bootstrap procedure to estimate incremental cost,
-#' incremental effectiveness, the Incremental Cost-Effectiveness Ratio (ICER),
-#' and Net Monetary Benefit (NMB) for one reference strategy compared with one
-#' or more alternative strategies. The function supports multi-strategy,
-#' multi-dataset and subgroup-based analyses under a unified analytical
-#' framework.
+#' incremental effectiveness, ICERs and NMBs for one reference strategy versus
+#' alternatives, supporting multi-dataset and subgroup-based analyses.
 #'
-#' The function automatically normalizes subgroup variables:
-#' \itemize{
-#'   \item Numeric or integer subgroups are converted to ordered factors.
-#'   \item Character subgroups are converted to unordered factors preserving
-#'         their observed order.
-#' }
+#' Subgroup variables are normalized automatically. When verbose = TRUE, the
+#' function prints global progress (0–100%) accumulated across all bootstrap
+#' iterations, with dataset and subgroup headers.
 #'
-#' When multiple datasets are supplied (as a named or unnamed list), the
-#' bootstrap analysis is applied to each dataset independently. Internal
-#' S3 objects store both overall and subgroup results in a structured form
-#' used by downstream summarization and plotting functions.
-#'
-#' @param data A data frame or a list of data frames. Each data frame must
-#'   contain the variables specified in \code{group}, \code{cost}, and
-#'   \code{effect}.
-#' @param group Character string specifying the strategy variable.
-#' @param cost Character string specifying the cost variable.
-#' @param effect Character string specifying the effectiveness variable.
-#' @param R Integer. Number of bootstrap replications (default: 1000).
-#' @param lambda Numeric vector of willingness-to-pay (WTP) thresholds for
-#'   computing Net Monetary Benefit (NMB).
-#' @param ci_type Character string specifying the type of confidence interval
-#'   to be computed using \code{boot::boot.ci} (e.g., "bca", "perc", "basic",
-#'   "norm").
-#' @param subgroup_vars Optional character vector with the names of subgroup
-#'   variables. Each subgroup is analyzed independently.
-#' @param seed Optional integer seed for reproducibility. If \code{NULL},
-#'   a seed is generated automatically.
-#' @param verbose Logical. If \code{TRUE}, progress bars and messages are
-#'   displayed during the bootstrap procedure.
-#' @param ref_group Character string specifying the reference strategy.
-#'   This argument is mandatory.
-#' @param alt_groups Optional character vector specifying the alternative
-#'   strategies. If \code{NULL}, all non-reference strategies observed
-#'   in the data are used.
-#'
-#' @return
-#' A \code{cea_results_list} S3 object containing:
-#' \itemize{
-#'   \item \code{[dataset_name]$Overall}: ICER analyses for the full dataset.
-#'   \item \code{[dataset_name]$Subgroups}: ICER analyses for each subgroup.
-#'   \item \code{combined_replicates}: Combined bootstrap samples across all
-#'         datasets and comparisons.
-#'   \item \code{summary_stats}: Summary statistics for costs, effects,
-#'         incremental values and NMB.
-#'   \item \code{settings}: List of analytical settings used in the run.
-#' }
-#' @importFrom stats sd setNames
-#' @importFrom utils txtProgressBar setTxtProgressBar
 #' @export
-compute_icers <- function(data, group, cost, effect,
-                          R = 1000, lambda = 25000,
-                          ci_type = "bca", subgroup_vars = NULL,
-                          seed = NULL, verbose = FALSE,
-                          ref_group, alt_groups = NULL) {
+compute_icers <- function(
+    data, group, cost, effect,
+    R = 1000, lambda = 25000,
+    ci_type = "bca", subgroup_vars = NULL,
+    seed = NULL, verbose = FALSE,
+    ref_group, alt_groups = NULL
+) {
 
   # ============================================================
-  # 0. Shared analysis environment
-  # ============================================================
-  .settings_env <- new.env(parent = emptyenv())
-  .settings_env$ref_group     <- ref_group
-  .settings_env$alt_groups    <- alt_groups
-  .settings_env$lambda        <- lambda
-  .settings_env$R             <- R
-  .settings_env$ci_type       <- ci_type
-  .settings_env$subgroup_vars <- subgroup_vars
-
-  # ============================================================
-  # 1. Seed
+  # 0. Seed + Settings
   # ============================================================
   if (is.null(seed)) seed <- as.integer(Sys.time()) %% 1e6
   set.seed(seed)
-  .settings_env$seed <- seed
+
+  settings_env <- list(
+    ref_group     = ref_group,
+    alt_groups    = alt_groups,
+    lambda        = lambda,
+    R             = R,
+    ci_type       = ci_type,
+    subgroup_vars = subgroup_vars,
+    seed          = seed
+  )
 
   # ============================================================
-  # 2. Normalize input data into list
+  # 1. Normalize Input
   # ============================================================
   if (is.data.frame(data)) {
-
     data_list <- list(single_dataset = data)
-
-  } else if (is.list(data)) {
-
+  } else {
     if (is.null(names(data)))
       names(data) <- paste0("dataset_", seq_along(data))
-
     data_list <- data
-
-  } else {
-    stop("`data` must be a data frame or list.")
   }
 
   # ============================================================
-  # 3. Bootstrap statistic function
+  # 2. Count TOTAL ITERATIONS for global verbose
   # ============================================================
-  ratio_fun <- function(d, i,
-                        group_col, cost_col, effect_col,
-                        lambda_vec, ref_name, alt_name) {
+  count_iters <- function(df) {
+    g <- factor(df[[group]], levels = sort(unique(df[[group]])))
+    alts <- if (is.null(alt_groups)) setdiff(levels(g), ref_group)
+    else intersect(levels(g), alt_groups)
 
-    d_boot <- d[i, ]
-    d_boot[[group_col]] <- as.factor(d_boot[[group_col]])
+    n_overall <- length(alts)
+    n_sub <- 0
+    if (!is.null(subgroup_vars))
+      for (s in subgroup_vars)
+        n_sub <- n_sub + length(unique(df[[s]])) * length(alts)
 
-    # Strategies must both exist in this bootstrap sample
-    if (!all(c(ref_name, alt_name) %in% unique(d_boot[[group_col]])))
+    R * (n_overall + n_sub)
+  }
+
+  TOTAL_ITER <- sum(sapply(data_list, count_iters))
+  global_iter <- 0
+
+
+  # ============================================================
+  # 3. Statistic + CI
+  # ============================================================
+  ratio_fun <- function(d, i, g, cst, eff, lambda_vec, ref, alt) {
+    d <- d[i, ]
+    d[[g]] <- factor(d[[g]])
+    if (!all(c(ref, alt) %in% unique(d[[g]])))
       return(rep(NA, 7 + length(lambda_vec)))
 
-    cost_means <- tapply(d_boot[[cost_col]],   d_boot[[group_col]], mean, na.rm = TRUE)
-    eff_means  <- tapply(d_boot[[effect_col]], d_boot[[group_col]], mean, na.rm = TRUE)
-
-    delta_cost <- cost_means[[alt_name]] - cost_means[[ref_name]]
-    delta_eff  <- eff_means[[alt_name]]  - eff_means[[ref_name]]
-    icer       <- ifelse(delta_eff == 0, NA, delta_cost / delta_eff)
-
-    nmb_vals <- sapply(lambda_vec, function(l)
-      l * delta_eff - delta_cost)
-
-    c(delta_cost, delta_eff, icer,
-      cost_means[[ref_name]], cost_means[[alt_name]],
-      eff_means[[ref_name]],  eff_means[[alt_name]],
-      nmb_vals)
+    cm <- tapply(d[[cst]],  d[[g]], mean)
+    em <- tapply(d[[eff]],  d[[g]], mean)
+    dc <- cm[[alt]] - cm[[ref]]
+    de <- em[[alt]] - em[[ref]]
+    icer <- ifelse(de == 0, NA, dc / de)
+    nmb <- sapply(lambda_vec, function(l) l * de - dc)
+    c(dc, de, icer, cm[[ref]], cm[[alt]], em[[ref]], em[[alt]], nmb)
   }
 
-  # ============================================================
-  # 4. CI wrapper
-  # ============================================================
-  safe_ci <- function(boot_obj, index) {
-
-    ci <- tryCatch(
-      boot::boot.ci(boot_obj, type = ci_type, index = index),
-      error = function(e) NULL
-    )
-
+  safe_ci <- function(boot_obj, idx, ci_type) {
+    ci <- tryCatch(boot::boot.ci(boot_obj, type = ci_type, index = idx),
+                   error = function(e) NULL)
     if (is.null(ci)) return(c(NA, NA))
-
     if (!is.null(ci[[ci_type]])) return(ci[[ci_type]][4:5])
     if (!is.null(ci$bca))        return(ci$bca[4:5])
     if (!is.null(ci$perc))       return(ci$perc[4:5])
-
     c(NA, NA)
   }
 
+
   # ============================================================
-  # 5. Analyze a dataset
+  # 4. Bootstrap runner + Global verbose
+  # ============================================================
+  run_boot_block <- function(df_comp, alt, label, indent = "") {
+    boot_res <- boot::boot(
+      data = df_comp,
+      statistic = function(d, i) {
+        global_iter <<- global_iter + 1
+        ratio_fun(d, i, group, cost, effect, lambda, ref_group, alt)
+      },
+      R = R,
+      strata = as.numeric(df_comp[[group]])
+    )
+
+    if (verbose) {
+      pct <- round(100 * global_iter / TOTAL_ITER)
+      if (pct > 100) pct <- 100
+      message(indent, label, " ... ", pct, "%")
+    }
+
+    boot_res
+  }
+
+
+  # ============================================================
+  # 5. OVERALL analysis (original logic preserved)
   # ============================================================
   analyze_data <- function(df, dataset_name) {
 
-    if (verbose)
-      message("[Dataset: ", dataset_name, "] Starting analysis...")
+    df[[group]] <- factor(df[[group]])
+    lv <- levels(df[[group]])
 
-    df[[group]] <- as.factor(df[[group]])
-    lvls <- levels(df[[group]])
-
-    if (!ref_group %in% lvls)
+    if (!ref_group %in% lv)
       stop("Reference group not found in dataset ", dataset_name)
 
-    alts <- if (is.null(alt_groups))
-      setdiff(lvls, ref_group)
-    else
-      intersect(lvls, alt_groups)
+    alts <- if (is.null(alt_groups)) setdiff(lv, ref_group)
+    else intersect(lv, alt_groups)
 
     results <- list()
 
     for (alt in alts) {
 
-      if (verbose)
-        message("  - Comparison: ", alt, " vs ", ref_group)
-
       df_comp <- df[df[[group]] %in% c(ref_group, alt), , drop = FALSE]
       df_comp[[group]] <- factor(df_comp[[group]], levels = c(ref_group, alt))
 
-      # Missing strategy → NA block
       if (any(table(df_comp[[group]]) == 0)) {
-
         empty <- rep(NA, 7 + length(lambda))
-        names(empty) <- c(
-          "Delta_Cost","Delta_Effect","ICER",
-          "Mean_Cost_ref","Mean_Cost_alt",
-          "Mean_Effect_ref","Mean_Effect_alt",
-          paste0("NMB_", lambda)
-        )
+        names(empty) <- c("Delta_Cost","Delta_Effect","ICER",
+                          "Mean_Cost_ref","Mean_Cost_alt",
+                          "Mean_Effect_ref","Mean_Effect_alt",
+                          paste0("NMB_", lambda))
 
         out <- list(
           comparison        = alt,
           bootstrap_samples = as.data.frame(t(empty)),
-          boot_ci           = setNames(
-            replicate(length(empty), c(NA, NA), simplify = FALSE),
-            names(empty)
-          ),
+          boot_ci           = setNames(replicate(length(empty), c(NA, NA), simplify = FALSE),
+                                       names(empty)),
           t0                = empty,
           bias              = rep(NA, length(empty))
         )
 
-        attr(out, "settings_env") <- .settings_env
         class(out) <- "cea_base"
+        attr(out, "settings_env") <- settings_env
         results[[alt]] <- out
         next
       }
 
-      # Bootstrap
-      pb <- NULL
-      if (verbose) {
-        pb <- txtProgressBar(min = 0, max = R, style = 3)
-        counter <- 0
-      }
-
-      boot_res <- boot::boot(
-        data = df_comp,
-        statistic = function(d, i) {
-
-          if (verbose) {
-            counter <<- counter + 1
-            if (counter %% 10 == 0 || counter == R)
-              setTxtProgressBar(pb, counter)
-          }
-
-          ratio_fun(d, i, group, cost, effect, lambda, ref_group, alt)
-        },
-        R = R,
-        strata = as.numeric(df_comp[[group]])
+      boot_res <- run_boot_block(
+        df_comp, alt,
+        label  = paste0("Overall comparison (", alt, " vs ", ref_group, ")"),
+        indent = "  "
       )
 
-      if (verbose && !is.null(pb)) close(pb)
-
-      stat_names <- c(
-        "Delta_Cost","Delta_Effect","ICER",
-        "Mean_Cost_ref","Mean_Cost_alt",
-        "Mean_Effect_ref","Mean_Effect_alt",
-        paste0("NMB_", lambda)
-      )
+      stat_names <- c("Delta_Cost","Delta_Effect","ICER",
+                      "Mean_Cost_ref","Mean_Cost_alt",
+                      "Mean_Effect_ref","Mean_Effect_alt",
+                      paste0("NMB_", lambda))
 
       colnames(boot_res$t) <- stat_names
-      names(boot_res$t0)  <- stat_names
-
-      ci_list <- lapply(seq_along(stat_names),
-                        function(j) safe_ci(boot_res, j))
+      ci_list <- lapply(seq_along(stat_names), function(j) safe_ci(boot_res, j, ci_type))
 
       out <- list(
         comparison        = alt,
         bootstrap_samples = as.data.frame(boot_res$t),
         boot_ci           = setNames(ci_list, stat_names),
-        t0                = boot_res$t0,
+        t0                = setNames(boot_res$t0, stat_names),
         bias              = colMeans(boot_res$t, na.rm = TRUE) - boot_res$t0
       )
 
-      attr(out, "settings_env") <- .settings_env
       class(out) <- "cea_base"
+      attr(out, "settings_env") <- settings_env
       results[[alt]] <- out
     }
 
@@ -260,64 +192,67 @@ compute_icers <- function(data, group, cost, effect,
     results
   }
 
+
   # ============================================================
-  # 6. Analyze datasets + subgroups (CORRECTED)
+  # 6. SUBGROUP analysis (FIXED)
   # ============================================================
   analyze_with_subgroups <- function(df, dataset_name) {
 
-    if (verbose)
-      message("[Dataset: ", dataset_name, "] Processing subgroups...")
+    if (verbose) {
+      pct <- round(100 * global_iter / TOTAL_ITER)
+      message("[Dataset: ", dataset_name, "] ... ", pct, "%")
+    }
 
-    # ---- CRITICAL FIX: Normalize subgroup variables to factors ----
     if (!is.null(subgroup_vars)) {
-
       for (v in subgroup_vars) {
-
-        if (is.numeric(df[[v]]) || is.integer(df[[v]])) {
-
-          df[[v]] <- factor(
-            df[[v]],
-            levels  = sort(unique(df[[v]])),
-            ordered = TRUE
-          )
-
-        } else {
-
-          df[[v]] <- factor(
-            df[[v]],
-            levels = unique(df[[v]]),
-            ordered = FALSE
-          )
-        }
+        if (is.numeric(df[[v]]) || is.integer(df[[v]]))
+          df[[v]] <- factor(df[[v]], levels = sort(unique(df[[v]])))
+        else
+          df[[v]] <- factor(df[[v]], levels = unique(df[[v]]))
       }
     }
 
-    # Overall analysis
     overall <- analyze_data(df, dataset_name)
 
-    # Subgroup analyses
     subs <- NULL
     if (!is.null(subgroup_vars)) {
 
       subs <- lapply(subgroup_vars, function(v) {
 
         split_df <- split(df, df[[v]])
+        levs <- names(split_df)
 
-        lapply(split_df, function(sub_df)
-          analyze_data(sub_df, dataset_name))
+        out_list <- lapply(levs, function(lvl) {
+
+          if (verbose) {
+            pct <- round(100 * global_iter / TOTAL_ITER)
+            message("  Subgroup ", v, " = ", lvl, " ... ", pct, "%")
+          }
+
+          sub_res <- analyze_data(split_df[[lvl]], dataset_name)
+
+          # CRITICAL FIX: store metadata for combine_icers_results()
+          attr(sub_res, "subgroup_var")   <- v
+          attr(sub_res, "subgroup_level") <- lvl
+
+          sub_res
+        })
+
+        # CRITICAL FIX: assign names to subgroup levels (required by combine_icers_results)
+        names(out_list) <- levs
+
+        out_list
       })
 
       names(subs) <- subgroup_vars
     }
 
-    structure(
-      list(Overall = overall, Subgroups = subs),
-      class = "cea_results"
-    )
+    structure(list(Overall = overall, Subgroups = subs), class = "cea_results")
   }
 
+
   # ============================================================
-  # 7. Apply to all datasets
+  # 7. APPLY TO ALL DATASETS
   # ============================================================
   result <- lapply(
     names(data_list),
@@ -328,33 +263,30 @@ compute_icers <- function(data, group, cost, effect,
   class(result) <- c("cea_results_list","list")
 
   # ============================================================
-  # 8. Combine replicates + summary stats
+  # 8. Combine + Summary
   # ============================================================
   result$combined_replicates <- combine_icers_results(result)
 
   result$summary_stats <- summarize_cea_data(
-    data         = data,
-    group        = group,
-    cost         = cost,
-    effect       = effect,
+    data          = data,
+    group         = group,
+    cost          = cost,
+    effect        = effect,
     subgroup_vars = subgroup_vars,
-    lambda       = lambda,
-    ref_group    = ref_group,
-    alt_groups   = alt_groups
+    lambda        = lambda,
+    ref_group     = ref_group,
+    alt_groups    = alt_groups
   )
 
-  class(result$summary_stats) <- c("summary_stats",
-                                   class(result$summary_stats))
-
-  attr(result$summary_stats, "settings_env") <- .settings_env
+  class(result$summary_stats) <- c("summary_stats", class(result$summary_stats))
+  attr(result$summary_stats, "settings_env") <- settings_env
 
   # ============================================================
-  # 9. Store settings
+  # 9. Store Settings + Return
   # ============================================================
-  result$settings <- as.list(.settings_env)
+  result$settings <- settings_env
 
-  if (verbose)
-    message("\nAnalysis completed successfully.\n")
+  if (verbose) message("Analysis completed.")
 
   return(result)
 }

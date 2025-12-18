@@ -19,72 +19,13 @@ compute_icers(
   alt_groups = NULL
 )
 }
-\arguments{
-\item{data}{A data frame or a list of data frames. Each data frame must
-contain the variables specified in \code{group}, \code{cost}, and
-\code{effect}.}
-
-\item{group}{Character string specifying the strategy variable.}
-
-\item{cost}{Character string specifying the cost variable.}
-
-\item{effect}{Character string specifying the effectiveness variable.}
-
-\item{R}{Integer. Number of bootstrap replications (default: 1000).}
-
-\item{lambda}{Numeric vector of willingness-to-pay (WTP) thresholds for
-computing Net Monetary Benefit (NMB).}
-
-\item{ci_type}{Character string specifying the type of confidence interval
-to be computed using \code{boot::boot.ci} (e.g., "bca", "perc", "basic",
-"norm").}
-
-\item{subgroup_vars}{Optional character vector with the names of subgroup
-variables. Each subgroup is analyzed independently.}
-
-\item{seed}{Optional integer seed for reproducibility. If \code{NULL},
-a seed is generated automatically.}
-
-\item{verbose}{Logical. If \code{TRUE}, progress bars and messages are
-displayed during the bootstrap procedure.}
-
-\item{ref_group}{Character string specifying the reference strategy.
-This argument is mandatory.}
-
-\item{alt_groups}{Optional character vector specifying the alternative
-strategies. If \code{NULL}, all non-reference strategies observed
-in the data are used.}
-}
-\value{
-A \code{cea_results_list} S3 object containing:
-\itemize{
-\item \code{[dataset_name]$Overall}: ICER analyses for the full dataset.
-\item \code{[dataset_name]$Subgroups}: ICER analyses for each subgroup.
-\item \code{combined_replicates}: Combined bootstrap samples across all
-datasets and comparisons.
-\item \code{summary_stats}: Summary statistics for costs, effects,
-incremental values and NMB.
-\item \code{settings}: List of analytical settings used in the run.
-}
-}
 \description{
 Implements a nonparametric bootstrap procedure to estimate incremental cost,
-incremental effectiveness, the Incremental Cost-Effectiveness Ratio (ICER),
-and Net Monetary Benefit (NMB) for one reference strategy compared with one
-or more alternative strategies. The function supports multi-strategy,
-multi-dataset and subgroup-based analyses under a unified analytical
-framework.
+incremental effectiveness, ICERs and NMBs for one reference strategy versus
+alternatives, supporting multi-dataset and subgroup-based analyses.
 }
 \details{
-The function automatically normalizes subgroup variables:
-\itemize{
-\item Numeric or integer subgroups are converted to ordered factors.
-\item Character subgroups are converted to unordered factors preserving
-their observed order.
-}
-
-When multiple datasets are supplied (as a named or unnamed list), the
-bootstrap analysis is applied to each dataset independently. Internal
-S3 objects store both overall and subgroup results in a structured form
-used by downstream summarization and plotting functions.
+Subgroup variables are normalized automatically. When verbose = TRUE, the
+function prints global progress (0–100\%) accumulated across all bootstrap
+iterations, with dataset and subgroup headers.
 }
