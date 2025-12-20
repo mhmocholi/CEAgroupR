@@ -64,7 +64,6 @@ compute_icers <- function(
   TOTAL_ITER <- sum(sapply(data_list, count_iters))
   global_iter <- 0
 
-
   # ============================================================
   # 3. Statistic + CI
   # ============================================================
@@ -74,8 +73,8 @@ compute_icers <- function(
     if (!all(c(ref, alt) %in% unique(d[[g]])))
       return(rep(NA, 7 + length(lambda_vec)))
 
-    cm <- tapply(d[[cst]],  d[[g]], mean)
-    em <- tapply(d[[eff]],  d[[g]], mean)
+    cm <- tapply(d[[cst]], d[[g]], mean)
+    em <- tapply(d[[eff]], d[[g]], mean)
     dc <- cm[[alt]] - cm[[ref]]
     de <- em[[alt]] - em[[ref]]
     icer <- ifelse(de == 0, NA, dc / de)
@@ -92,7 +91,6 @@ compute_icers <- function(
     if (!is.null(ci$perc))       return(ci$perc[4:5])
     c(NA, NA)
   }
-
 
   # ============================================================
   # 4. Bootstrap runner + Global verbose
@@ -117,11 +115,10 @@ compute_icers <- function(
     boot_res
   }
 
-
   # ============================================================
-  # 5. OVERALL analysis (original logic preserved)
+  # 5. OVERALL / SUBGROUP analysis
   # ============================================================
-  analyze_data <- function(df, dataset_name) {
+  analyze_data <- function(df, dataset_name, verbose_prefix = NULL) {
 
     df[[group]] <- factor(df[[group]])
     lv <- levels(df[[group]])
@@ -139,31 +136,15 @@ compute_icers <- function(
       df_comp <- df[df[[group]] %in% c(ref_group, alt), , drop = FALSE]
       df_comp[[group]] <- factor(df_comp[[group]], levels = c(ref_group, alt))
 
-      if (any(table(df_comp[[group]]) == 0)) {
-        empty <- rep(NA, 7 + length(lambda))
-        names(empty) <- c("Delta_Cost","Delta_Effect","ICER",
-                          "Mean_Cost_ref","Mean_Cost_alt",
-                          "Mean_Effect_ref","Mean_Effect_alt",
-                          paste0("NMB_", lambda))
-
-        out <- list(
-          comparison        = alt,
-          bootstrap_samples = as.data.frame(t(empty)),
-          boot_ci           = setNames(replicate(length(empty), c(NA, NA), simplify = FALSE),
-                                       names(empty)),
-          t0                = empty,
-          bias              = rep(NA, length(empty))
-        )
-
-        class(out) <- "cea_base"
-        attr(out, "settings_env") <- settings_env
-        results[[alt]] <- out
-        next
+      label <- if (is.null(verbose_prefix)) {
+        paste0("Overall comparison (", alt, " vs ", ref_group, ")")
+      } else {
+        paste0(verbose_prefix, " | ", alt, " vs ", ref_group)
       }
 
       boot_res <- run_boot_block(
         df_comp, alt,
-        label  = paste0("Overall comparison (", alt, " vs ", ref_group, ")"),
+        label  = label,
         indent = "  "
       )
 
@@ -192,9 +173,8 @@ compute_icers <- function(
     results
   }
 
-
   # ============================================================
-  # 6. SUBGROUP analysis (FIXED)
+  # 6. SUBGROUP analysis
   # ============================================================
   analyze_with_subgroups <- function(df, dataset_name) {
 
@@ -229,18 +209,21 @@ compute_icers <- function(
             message("  Subgroup ", v, " = ", lvl, " ... ", pct, "%")
           }
 
-          sub_res <- analyze_data(split_df[[lvl]], dataset_name)
+          prefix <- paste0("Subgroup ", v, " = ", lvl)
 
-          # CRITICAL FIX: store metadata for combine_icers_results()
+          sub_res <- analyze_data(
+            split_df[[lvl]],
+            dataset_name,
+            verbose_prefix = prefix
+          )
+
           attr(sub_res, "subgroup_var")   <- v
           attr(sub_res, "subgroup_level") <- lvl
 
           sub_res
         })
 
-        # CRITICAL FIX: assign names to subgroup levels (required by combine_icers_results)
         names(out_list) <- levs
-
         out_list
       })
 
@@ -249,7 +232,6 @@ compute_icers <- function(
 
     structure(list(Overall = overall, Subgroups = subs), class = "cea_results")
   }
-
 
   # ============================================================
   # 7. APPLY TO ALL DATASETS
