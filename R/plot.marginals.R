@@ -11,7 +11,10 @@
 #' Colour aesthetics reflect the primary comparison grouping unless overridden
 #' by the user. Fill aesthetics reuse the same palette with controlled
 #' transparency. When \code{shape_by = NULL} or \code{"none"}, all linetype and
-#' shape aesthetics are disabled.
+#' shape aesthetics are disabled. Legends corresponding to aesthetics with a
+#' single effective level are automatically suppressed. For histogram
+#' geometries, dataset-level legends are rendered using line-based keys to
+#' ensure visual informativeness.
 #'
 #' @inheritParams plot.icers
 #'
@@ -154,6 +157,25 @@ plot.marginals <- function(
   }
 
   # ============================================================
+  # 8b. Legend cleanup (automatic suppression of non-informative legends)
+  # ============================================================
+  if (!is.null(color_var) &&
+      dplyr::n_distinct(df[[color_var]]) == 1) {
+    p <- p + ggplot2::guides(
+      colour = "none",
+      fill   = "none"
+    )
+  }
+
+  if (shape_active &&
+      dplyr::n_distinct(df[[shape_var]]) == 1) {
+    p <- p + ggplot2::guides(
+      shape    = "none",
+      linetype = "none"
+    )
+  }
+
+  # ============================================================
   # 9. Geometry layers
   # ============================================================
 
@@ -176,34 +198,10 @@ plot.marginals <- function(
     p <- p + ggplot2::geom_density(
       data        = df,
       mapping     = aes_density,
-      alpha       = 0.5,
+      alpha       = alpha_val,
       linewidth   = lw_val,
       inherit.aes = FALSE
     )
-
-    # Legend override when shape is active
-    if (shape_active && dplyr::n_distinct(df[[shape_var]]) > 1) {
-
-      if (!is.null(color_var) && color_var == shape_var) {
-        override_fill   <- fill_palette
-        override_colour <- palette_values
-      } else {
-        override_fill   <- rep("grey85", length(linetype_values))
-        override_colour <- rep("black",   length(linetype_values))
-      }
-
-      p <- p + ggplot2::guides(
-        linetype = ggplot2::guide_legend(
-          title        = shape_var,
-          override.aes = list(
-            fill     = override_fill,
-            colour   = override_colour,
-            linetype = linetype_values,
-            size     = 0.7
-          )
-        )
-      )
-    }
 
     # ------------------------------ HISTOGRAM ------------------------------
   } else if (geom_type == "histogram") {
@@ -225,30 +223,23 @@ plot.marginals <- function(
       data        = df,
       mapping     = aes_hist,
       bins        = bins,
-      alpha       = 0.5,
+      alpha       = alpha_val,
       linewidth   = lw_val,
       position    = "identity",
       inherit.aes = FALSE
     )
 
-    if (shape_active && dplyr::n_distinct(df[[shape_var]]) > 1) {
-
-      if (!is.null(color_var) && color_var == shape_var) {
-        override_fill   <- fill_palette
-        override_colour <- palette_values
-      } else {
-        override_fill   <- rep("grey85", length(linetype_values))
-        override_colour <- rep("black",   length(linetype_values))
-      }
+    if (shape_active &&
+        dplyr::n_distinct(df[[shape_var]]) > 1) {
 
       p <- p + ggplot2::guides(
         linetype = ggplot2::guide_legend(
-          title = shape_var,
+          title        = shape_var,
           override.aes = list(
-            fill     = override_fill,
-            colour   = override_colour,
-            linetype = linetype_values,
-            size     = 0.7
+            colour    = "black",
+            fill      = NA,
+            linetype  = linetype_values,
+            linewidth = 0.8
           )
         )
       )
@@ -262,7 +253,7 @@ plot.marginals <- function(
       stop("Boxplot requires a valid `color_by` aesthetic.")
 
     aes_box <- ggplot2::aes(
-      x = factor(.data[[x_var]], levels = unique(.data[[x_var]])),
+      x = .data[[x_var]],
       y = .data[[var_col]]
     )
 
@@ -274,73 +265,47 @@ plot.marginals <- function(
     if (shape_active)
       aes_box$linetype <- rlang::sym(shape_var)
 
-    p <- ggplot2::ggplot(df, aes_box) +
-      ggplot2::geom_boxplot(
-        alpha         = 0.4,
-        linewidth     = lw_val,
-        outlier.shape = 21,
-        outlier.size  = 1.4
-      ) +
-      base$plot$theme
+    p <- p + ggplot2::geom_boxplot(
+      data          = df,
+      mapping       = aes_box,
+      alpha         = alpha_val,
+      linewidth     = lw_val,
+      outlier.shape = 21,
+      outlier.size  = 1.4,
+      inherit.aes   = FALSE
+    )
+  }
 
-    if (!is.null(color_var)) {
-      p <- p + ggplot2::scale_colour_manual(values = palette_values)
-      p <- p + ggplot2::scale_fill_manual(values = fill_palette)
-    }
-
-    if (shape_active)
-      p <- p + ggplot2::scale_linetype_manual(values = linetype_values)
-
-    if (shape_active && dplyr::n_distinct(df[[shape_var]]) > 1) {
-
-      if (!is.null(color_var) && color_var == shape_var) {
-        override_fill   <- fill_palette
-        override_colour <- palette_values
-      } else {
-        override_fill   <- rep("grey85", length(linetype_values))
-        override_colour <- rep("black",   length(linetype_values))
-      }
-
-      p <- p + ggplot2::guides(
-        linetype = ggplot2::guide_legend(
-          title = shape_var,
-          override.aes = list(
-            fill     = override_fill,
-            colour   = override_colour,
-            linetype = linetype_values,
-            size     = 0.7
-          )
-        )
-      )
-    }
+  # ============================================================
+  # 10. Final labels and scales
+  # ============================================================
+  if (geom_type != "boxplot") {
 
     p <- p +
+      ggplot2::scale_x_continuous(labels = scales::label_number()) +
+      ggplot2::scale_y_continuous(labels = scales::label_number()) +
       ggplot2::labs(
         title    = paste("Distribution of Delta", tools::toTitleCase(variable)),
-        x        = x_var,
-        y        = "Value",
+        x        = paste("Delta", tools::toTitleCase(variable)),
+        y        = "Density",
         colour   = color_var,
         fill     = color_var,
         linetype = shape_var
       )
 
-    return(p)
-  }
+  } else {
 
-  # ============================================================
-  # 10. Final labels for histogram/density
-  # ============================================================
-  p <- p +
-    ggplot2::scale_x_continuous(labels = scales::label_number()) +
-    ggplot2::scale_y_continuous(labels = scales::label_number()) +
-    ggplot2::labs(
-      title    = paste("Distribution of Delta", tools::toTitleCase(variable)),
-      x        = paste("Delta", tools::toTitleCase(variable)),
-      y        = "Density",
-      colour   = color_var,
-      fill     = color_var,
-      linetype = shape_var
-    )
+    p <- p +
+      ggplot2::scale_y_continuous(labels = scales::label_number()) +
+      ggplot2::labs(
+        title    = paste("Distribution of Delta", tools::toTitleCase(variable)),
+        x        = color_var,
+        y        = "Value",
+        colour   = color_var,
+        fill     = color_var,
+        linetype = shape_var
+      )
+  }
 
   return(p)
 }

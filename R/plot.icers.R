@@ -176,13 +176,20 @@ plot.icers <- function(
     ggplot2::geom_vline(xintercept = 0, colour = "grey70", linetype = "dashed")
 
   # ========================================================================
-  # 9. Legend cleanup
+  # 9. Legend cleanup (harmonized with CEAC / EVPI)
   # ========================================================================
-  if (valid_color && dplyr::n_distinct(df[[color_var]]) == 1)
+  if (valid_color &&
+      dplyr::n_distinct(df[[color_var]]) == 1) {
     p <- p + ggplot2::guides(colour = "none")
+  }
 
-  if (valid_shape && dplyr::n_distinct(df[[shape_var]]) == 1)
-    p <- p + ggplot2::guides(shape = "none")
+  if (valid_shape &&
+      dplyr::n_distinct(df[[shape_var]]) == 1) {
+    p <- p + ggplot2::guides(
+      shape    = "none",
+      linetype = "none"
+    )
+  }
 
   # ========================================================================
   # 10. Bootstrap clouds
@@ -380,12 +387,23 @@ plot.icers <- function(
   }
 
   # ========================================================================
-  # 15. Force alpha=1 in legends
+  # 15. Force alpha=1 in legends (only when legends are active)
   # ========================================================================
-  p <- p + ggplot2::guides(
-    colour = ggplot2::guide_legend(override.aes = list(alpha = 1)),
-    shape  = ggplot2::guide_legend(override.aes = list(alpha = 1))
-  )
+  if (valid_color &&
+      dplyr::n_distinct(df[[color_var]]) > 1) {
+    p <- p + ggplot2::guides(
+      colour = ggplot2::guide_legend(override.aes = list(alpha = 1))
+    )
+  }
+
+  if (valid_shape &&
+      dplyr::n_distinct(df[[shape_var]]) > 1) {
+    p <- p + ggplot2::guides(
+      shape  = ggplot2::guide_legend(override.aes = list(alpha = 1)),
+      linetype = ggplot2::guide_legend(override.aes = list(alpha = 1))
+    )
+  }
+
 
   # ========================================================================
   # 16. WTP lambda lines

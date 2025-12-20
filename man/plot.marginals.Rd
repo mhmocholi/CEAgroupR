@@ -74,5 +74,8 @@ faceting rules, and user-driven aesthetic overrides.
 Colour aesthetics reflect the primary comparison grouping unless overridden
 by the user. Fill aesthetics reuse the same palette with controlled
 transparency. When \code{shape_by = NULL} or \code{"none"}, all linetype and
-shape aesthetics are disabled.
+shape aesthetics are disabled. Legends corresponding to aesthetics with a
+single effective level are automatically suppressed. For histogram
+geometries, dataset-level legends are rendered using line-based keys to
+ensure visual informativeness.
 }
