@@ -36,6 +36,7 @@ plot.evpis <- function(
     lambda_max   = NULL,
     lambda_steps = 100,
     palette      = "Dark2",
+    shapes_palette = NULL,
     return_data  = FALSE,
     ...
 ) {
@@ -154,18 +155,20 @@ plot.evpis <- function(
   # 7. Base layout via ce_plot_base()
   # ============================================================
   base <- ce_plot_base(
-    data         = evpi_df,
-    color_by     = resolved_color,
-    shape_by     = resolved_shape,
-    facet_by     = resolved_facet,
-    facet_scales = facet_scales,
-    palette      = palette
+    data           = evpi_df,
+    color_by       = resolved_color,
+    shape_by       = resolved_shape,
+    facet_by       = resolved_facet,
+    facet_scales   = facet_scales,
+    palette        = palette,
+    shapes_palette = shapes_palette
   )
 
   p <- base$plot
-  color_var      <- base$color_var
-  shape_var      <- base$shape_var
-  palette_values <- base$palette_values
+  color_var       <- base$color_var
+  shape_var       <- base$shape_var
+  palette_values  <- base$palette_values
+  linetype_values <- base$linetype_values
 
   args      <- list(...)
   lw        <- args$linewidth %||% 1
@@ -177,8 +180,13 @@ plot.evpis <- function(
   if (!is.null(color_var))
     p <- p + ggplot2::scale_colour_manual(values = palette_values)
 
-  if (!is.null(shape_var))
-    p <- p + ggplot2::scale_linetype_discrete()
+  if (!is.null(shape_var)) {
+    if (!is.null(linetype_values)) {
+      p <- p + ggplot2::scale_linetype_manual(values = linetype_values)
+    } else {
+      p <- p + ggplot2::scale_linetype_discrete()
+    }
+  }
 
   # Hide legends with only one level
   if (!is.null(color_var) &&

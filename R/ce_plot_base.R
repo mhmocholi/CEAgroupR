@@ -27,6 +27,8 @@
 #'   (default: \code{"fixed"}).
 #' @param palette A named vector of colours or a palette name recognized by
 #'   \code{RColorBrewer}. Defaults to \code{"Dark2"}.
+#' @param shapes_palette Optional object of class \code{"cea_shapes"}
+#'   defining custom shape and/or linetype values.
 #' @param theme_base A \code{ggplot2} theme applied to the base plot.
 #'   Defaults to \code{ggplot2::theme_bw()}.
 #' @param auto_layout Ignored. Retained for backward compatibility.
@@ -46,14 +48,15 @@
 #' @noRd
 ce_plot_base <- function(
     data,
-    color_by      = NULL,
-    shape_by      = NULL,
-    facet_by      = NULL,
-    filter_expr   = NULL,
-    facet_scales  = "fixed",
-    palette       = "Dark2",
-    theme_base    = ggplot2::theme_bw(),
-    auto_layout   = TRUE
+    color_by        = NULL,
+    shape_by        = NULL,
+    facet_by        = NULL,
+    filter_expr     = NULL,
+    facet_scales    = "fixed",
+    palette         = "Dark2",
+    shapes_palette  = NULL,
+    theme_base      = ggplot2::theme_bw(),
+    auto_layout     = TRUE
 ) {
 
   # ---------------------------------------------------------------------------
@@ -197,9 +200,36 @@ ce_plot_base <- function(
   linetype_values <- NULL
 
   if (!is.null(shape_by)) {
+
     lvls <- sort(unique(data[[shape_by]]))
+
+    # Default shapes and linetypes
     shape_values    <- generate_shapes(lvls)
     linetype_values <- generate_linetypes(lvls)
+
+    # Override with custom shapes palette if provided
+    if (!is.null(shapes_palette)) {
+
+      if (!inherits(shapes_palette, "cea_shapes")) {
+        stop("'shapes_palette' must be an object of class 'cea_shapes'.")
+      }
+
+      if (!is.null(shapes_palette$shapes)) {
+        shape_values <- rep(
+          shapes_palette$shapes,
+          length.out = length(lvls)
+        )
+        names(shape_values) <- lvls
+      }
+
+      if (!is.null(shapes_palette$linetypes)) {
+        linetype_values <- rep(
+          shapes_palette$linetypes,
+          length.out = length(lvls)
+        )
+        names(linetype_values) <- lvls
+      }
+    }
   }
 
   # ---------------------------------------------------------------------------

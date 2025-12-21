@@ -17,9 +17,9 @@
 #' @param color_by Variable used for colour mapping. Use \code{"none"} to
 #'   disable colour mapping. Defaults to \code{"comparison"} unless
 #'   overridden by the user.
-#' @param shape_by Variable used to distinguish groups using point shape
-#'   and line type. Use \code{"none"} to disable shape mapping. Defaults to
-#'   \code{"dataset"} unless overridden.
+#' @param shape_by Variable used to distinguish groups using point shape.
+#'   Use \code{"none"} to disable shape mapping. Defaults to \code{"dataset"}
+#'   unless overridden.
 #' @param facet_by Faceting directive. Options include
 #'   \code{"dataset"}, \code{"comparison"},
 #'   \code{"subgroup_var"}, \code{"subgroup_level"},
@@ -42,6 +42,8 @@
 #' @param facet_scales Passed to ggplot2 faceting functions.
 #' @param palette Colour palette name or vector passed to
 #'   \code{ce_plot_base}.
+#' @param shapes_palette Optional object of class \code{"cea_shapes"}
+#'   defining custom shape values for point layers.
 #' @param ... Additional graphical parameters passed to point layers.
 #'
 #' @return A \code{ggplot} object.
@@ -62,6 +64,7 @@ plot.icers <- function(
     contour_level = 0.95,
     facet_scales  = "fixed",
     palette       = "Dark2",
+    shapes_palette = NULL,
     ...
 ) {
 
@@ -79,8 +82,10 @@ plot.icers <- function(
   }
 
   if (!"group_uid" %in% names(df)) {
-    df$group_uid <- with(df, paste(dataset, subgroup_var,
-                                   subgroup_level, comparison, sep = "_"))
+    df$group_uid <- with(
+      df,
+      paste(dataset, subgroup_var, subgroup_level, comparison, sep = "_")
+    )
   }
 
   # ========================================================================
@@ -102,7 +107,7 @@ plot.icers <- function(
   }
 
   # ========================================================================
-  # 4. Default aesthetic mappings (user can override)
+  # 4. Default aesthetic mappings
   # ========================================================================
   default_color <- "comparison"
   default_shape <- "dataset"
@@ -120,12 +125,13 @@ plot.icers <- function(
   # 5. Base layout via ce_plot_base()
   # ========================================================================
   base <- ce_plot_base(
-    data         = df,
-    color_by     = resolved_color,
-    shape_by     = resolved_shape,
-    facet_by     = resolved_facet,
-    facet_scales = facet_scales,
-    palette      = palette
+    data           = df,
+    color_by       = resolved_color,
+    shape_by       = resolved_shape,
+    facet_by       = resolved_facet,
+    facet_scales   = facet_scales,
+    palette        = palette,
+    shapes_palette = shapes_palette
   )
 
   p             <- base$plot
@@ -135,8 +141,8 @@ plot.icers <- function(
   shape_vals    <- base$shape_values
   linetype_vals <- base$linetype_values
 
-  valid_color   <- !is.null(color_var)
-  valid_shape   <- !is.null(shape_var)
+  valid_color <- !is.null(color_var)
+  valid_shape <- !is.null(shape_var)
 
   # ========================================================================
   # 6. Colour scale
@@ -159,14 +165,15 @@ plot.icers <- function(
   }
 
   # ========================================================================
-  # 7. Cloud aesthetics
+  # 7. Shape scale (points and means only)
   # ========================================================================
-  aes_cloud <- ggplot2::aes(
-    x = Delta_Effect,
-    y = Delta_Cost
-  )
-  if (valid_color) aes_cloud$colour <- rlang::sym(color_var)
-  if (valid_shape) aes_cloud$shape  <- rlang::sym(shape_var)
+  if (valid_shape) {
+    if (!is.null(shape_vals)) {
+      p <- p + ggplot2::scale_shape_manual(values = shape_vals)
+    } else {
+      p <- p + ggplot2::scale_shape_discrete()
+    }
+  }
 
   # ========================================================================
   # 8. Axes
@@ -176,7 +183,7 @@ plot.icers <- function(
     ggplot2::geom_vline(xintercept = 0, colour = "grey70", linetype = "dashed")
 
   # ========================================================================
-  # 9. Legend cleanup (harmonized with CEAC / EVPI)
+  # 9. Legend cleanup
   # ========================================================================
   if (valid_color &&
       dplyr::n_distinct(df[[color_var]]) == 1) {
@@ -185,10 +192,7 @@ plot.icers <- function(
 
   if (valid_shape &&
       dplyr::n_distinct(df[[shape_var]]) == 1) {
-    p <- p + ggplot2::guides(
-      shape    = "none",
-      linetype = "none"
-    )
+    p <- p + ggplot2::guides(shape = "none")
   }
 
   # ========================================================================
@@ -204,6 +208,13 @@ plot.icers <- function(
     alpha_val <- usr$alpha %||% alpha_auto
     size_val  <- usr$size  %||% 1.2
 
+    aes_cloud <- ggplot2::aes(
+      x = Delta_Effect,
+      y = Delta_Cost
+    )
+    if (valid_color) aes_cloud$colour <- rlang::sym(color_var)
+    if (valid_shape) aes_cloud$shape  <- rlang::sym(shape_var)
+
     p <- p +
       ggplot2::geom_point(
         data        = df,
@@ -217,23 +228,15 @@ plot.icers <- function(
   # ========================================================================
   # 11. Contours
   # ========================================================================
-  layer_contours <- NULL
-
   if (show_contours) {
 
     contour_type  <- match.arg(contour_type, c("non_parametric", "ellipse"))
     contour_level <- pmin(pmax(contour_level, 0.001), 0.999)
 
-    contour_layers <- list()
-
     for (gid in unique(df$group_uid)) {
 
       sub <- df[df$group_uid == gid, ]
       if (nrow(sub) < 30) next
-
-      sub_info <- sub[1, c("dataset", "subgroup_var",
-                           "subgroup_level", "comparison", "group_uid"),
-                      drop = FALSE]
 
       color_key <- if (valid_color) as.character(unique(sub[[color_var]])[1]) else "fixed"
       col_ct    <- colorspace::darken(color_map[[color_key]], 0.55)
@@ -245,22 +248,15 @@ plot.icers <- function(
         lt_ct <- "solid"
       }
 
-      # ----- NON-PARAMETRIC KDE -----
       if (contour_type == "non_parametric") {
 
-        dens <- tryCatch(
-          MASS::kde2d(sub$Delta_Effect, sub$Delta_Cost, n = 200),
-          error = function(e) NULL
-        )
-        if (is.null(dens)) next
+        dens <- MASS::kde2d(sub$Delta_Effect, sub$Delta_Cost, n = 200)
 
         grid <- expand.grid(
           Delta_Effect = dens$x,
           Delta_Cost   = dens$y
         )
         grid$z <- as.vector(dens$z)
-
-        grid[, names(sub_info)] <- sub_info[rep(1, nrow(grid)), ]
 
         dx <- diff(dens$x)[1]
         dy <- diff(dens$y)[1]
@@ -269,17 +265,17 @@ plot.icers <- function(
         cum_vol  <- cumsum(z_sorted) * dx * dy
 
         for (lvl in contour_level) {
-
           idx <- which(cum_vol >= lvl)[1]
-          if (is.na(idx)) idx <- length(z_sorted)
           threshold <- z_sorted[idx]
 
-          contour_layers[[length(contour_layers) + 1]] <-
+          p <- p +
             ggplot2::geom_contour(
               data        = grid,
-              mapping     = ggplot2::aes(x = Delta_Effect,
-                                         y = Delta_Cost,
-                                         z = z),
+              mapping     = ggplot2::aes(
+                x = Delta_Effect,
+                y = Delta_Cost,
+                z = z
+              ),
               breaks      = threshold,
               colour      = col_ct,
               linetype    = lt_ct,
@@ -291,10 +287,8 @@ plot.icers <- function(
 
       } else {
 
-        # ----- ELLIPSE -----
         mu <- colMeans(sub[, c("Delta_Effect", "Delta_Cost")], na.rm = TRUE)
-        cv <- stats::cov(sub[, c("Delta_Effect", "Delta_Cost")],
-                         use = "pairwise")
+        cv <- stats::cov(sub[, c("Delta_Effect", "Delta_Cost")], use = "pairwise")
         eg <- eigen(cv)
 
         for (lvl in contour_level) {
@@ -306,16 +300,12 @@ plot.icers <- function(
                     (sqrt(eg$values) * chi *
                        rbind(cos(t), sin(t))))
 
-          df_el <- data.frame(
-            Delta_Effect = xy[, 1],
-            Delta_Cost   = xy[, 2]
-          )
-
-          df_el[, names(sub_info)] <- sub_info[rep(1, nrow(df_el)), ]
-
-          contour_layers[[length(contour_layers) + 1]] <-
+          p <- p +
             ggplot2::geom_path(
-              data        = df_el,
+              data = data.frame(
+                Delta_Effect = xy[, 1],
+                Delta_Cost   = xy[, 2]
+              ),
               mapping     = ggplot2::aes(Delta_Effect, Delta_Cost),
               colour      = col_ct,
               linetype    = lt_ct,
@@ -326,18 +316,14 @@ plot.icers <- function(
         }
       }
     }
-
-    layer_contours <- contour_layers
   }
 
   # ========================================================================
   # 12. Mean points
   # ========================================================================
-  layer_means <- NULL
-
   if (show_means) {
 
-    means <- base$data %>%
+    means <- df %>%
       dplyr::group_by(dataset, subgroup_var, subgroup_level,
                       comparison, group_uid) %>%
       dplyr::summarise(
@@ -353,60 +339,26 @@ plot.icers <- function(
     means$fill_col   <- color_map[means$colour_key]
     means$border_col <- colorspace::darken(means$fill_col, 0.55)
 
-    layer_means <- ggplot2::geom_point(
-      data = means,
-      mapping = ggplot2::aes(
-        x = Delta_Effect,
-        y = Delta_Cost,
-        shape = shape_key,
-        group = group_uid
-      ),
-      fill        = means$fill_col,
-      colour      = means$border_col,
-      size        = 2.5,
-      stroke      = 1,
-      inherit.aes = FALSE,
-      show.legend = FALSE
-    )
+    p <- p +
+      ggplot2::geom_point(
+        data = means,
+        mapping = ggplot2::aes(
+          x = Delta_Effect,
+          y = Delta_Cost,
+          shape = shape_key,
+          group = group_uid
+        ),
+        fill        = means$fill_col,
+        colour      = means$border_col,
+        size        = 2.5,
+        stroke      = 1,
+        inherit.aes = FALSE,
+        show.legend = FALSE
+      )
   }
 
   # ========================================================================
-  # 13. Add contour layers
-  # ========================================================================
-  if (!is.null(layer_contours)) {
-    for (lay in layer_contours) {
-      p <- p + lay
-    }
-  }
-
-  # ========================================================================
-  # 14. Add mean points
-  # ========================================================================
-  if (!is.null(layer_means)) {
-    p <- p + layer_means
-  }
-
-  # ========================================================================
-  # 15. Force alpha=1 in legends (only when legends are active)
-  # ========================================================================
-  if (valid_color &&
-      dplyr::n_distinct(df[[color_var]]) > 1) {
-    p <- p + ggplot2::guides(
-      colour = ggplot2::guide_legend(override.aes = list(alpha = 1))
-    )
-  }
-
-  if (valid_shape &&
-      dplyr::n_distinct(df[[shape_var]]) > 1) {
-    p <- p + ggplot2::guides(
-      shape  = ggplot2::guide_legend(override.aes = list(alpha = 1)),
-      linetype = ggplot2::guide_legend(override.aes = list(alpha = 1))
-    )
-  }
-
-
-  # ========================================================================
-  # 16. WTP lambda lines
+  # 13. WTP lambda lines
   # ========================================================================
   if (show_lambdas && !is.null(lambda_vals)) {
 
@@ -444,13 +396,13 @@ plot.icers <- function(
   }
 
   # ========================================================================
-  # 17. Labels
+  # 14. Labels
   # ========================================================================
   p <- p +
     ggplot2::labs(
       title = "Incremental Cost-Effectiveness Plane",
-      x     = expression(Delta*" Effect"),
-      y     = expression(Delta*" Cost")
+      x     = expression(Delta * " Effect"),
+      y     = expression(Delta * " Cost")
     )
 
   return(p)

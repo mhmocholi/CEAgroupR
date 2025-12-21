@@ -18,6 +18,7 @@
   show_lambdas = FALSE,
   lambdas = NULL,
   palette = "Dark2",
+  shapes_palette = NULL,
   return_data = FALSE,
   ...
 )
@@ -30,9 +31,9 @@ produced by \code{combine_icers_results}.}
 disable colour mapping. Defaults to \code{"comparison"} unless
 overridden by the user.}
 
-\item{shape_by}{Variable used to distinguish groups using point shape
-and line type. Use \code{"none"} to disable shape mapping. Defaults to
-\code{"dataset"} unless overridden.}
+\item{shape_by}{Variable used to distinguish groups using point shape.
+Use \code{"none"} to disable shape mapping. Defaults to \code{"dataset"}
+unless overridden.}
 
 \item{facet_by}{Faceting directive. Options include
 \code{"dataset"}, \code{"comparison"},
@@ -64,6 +65,9 @@ at the values supplied to \code{lambdas}.}
 
 \item{palette}{Colour palette name or vector passed to
 \code{ce_plot_base}.}
+
+\item{shapes_palette}{Optional object of class \code{"cea_shapes"}
+defining custom shape values for point layers.}
 
 \item{return_data}{Logical; if \code{TRUE}, return the CEAC data table
 instead of a plot.}

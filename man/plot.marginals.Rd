@@ -33,9 +33,9 @@ produced by \code{combine_icers_results}.}
 disable colour mapping. Defaults to \code{"comparison"} unless
 overridden by the user.}
 
-\item{shape_by}{Variable used to distinguish groups using point shape
-and line type. Use \code{"none"} to disable shape mapping. Defaults to
-\code{"dataset"} unless overridden.}
+\item{shape_by}{Variable used to distinguish groups using point shape.
+Use \code{"none"} to disable shape mapping. Defaults to \code{"dataset"}
+unless overridden.}
 
 \item{facet_by}{Faceting directive. Options include
 \code{"dataset"}, \code{"comparison"},
