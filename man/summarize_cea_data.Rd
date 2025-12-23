@@ -16,61 +16,104 @@ summarize_cea_data(
 )
 }
 \arguments{
-\item{data}{A data frame or a named list of data frames containing cost and
-effectiveness variables.}
+\item{data}{A data frame or a named list of data frames containing individual-level
+cost and effectiveness outcomes. When a list is supplied, each element is
+treated as a separate dataset representing a distinct analytical scenario.}
 
-\item{group}{Character string specifying the strategy variable.}
+\item{group}{Character string specifying the variable that identifies the
+intervention or strategy group.}
 
 \item{cost}{Character string specifying the cost variable.}
 
-\item{effect}{Character string specifying the effectiveness (e.g., QALYs)
-variable.}
+\item{effect}{Character string specifying the effectiveness variable
+(e.g. QALYs or other health outcomes).}
 
-\item{subgroup_vars}{Optional character vector with subgroup variable names.
-Each subgroup is summarized independently.}
+\item{subgroup_vars}{Optional character vector specifying one or more subgroup
+variables. When provided, summaries are computed independently for each
+subgroup level in addition to the overall population.}
 
 \item{lambda}{Numeric vector of willingness-to-pay thresholds used to compute
-Net Monetary Benefit (NMB).}
+Net Monetary Benefits (NMBs).}
 
 \item{ref_group}{Character string identifying the reference strategy.}
 
-\item{alt_groups}{Optional character vector defining the alternative
-strategies. If \code{NULL}, all non-reference strategies observed in the
-dataset are used.}
+\item{alt_groups}{Optional character vector defining which alternative
+strategies should be contrasted with the reference. If \code{NULL}, all
+non-reference strategies observed in the data are used.}
 }
 \value{
-A tibble containing descriptive summaries for each dataset, subgroup and
-strategy comparison. The output includes:
+A tidy tibble containing descriptive summaries for each dataset, subgroup and
+strategy comparison, including:
 \itemize{
-\item \code{dataset}: Dataset identifier.
-\item \code{subgroup_var}: Subgroup variable ("Overall" if none).
-\item \code{subgroup_level}: Subgroup level as a factor.
-\item \code{comparison}: Alternative strategy compared with the reference.
-\item \code{n_ref}, \code{n_alt}: Sample sizes per strategy.
-\item \code{mean_cost_ref}, \code{mean_cost_alt}: Mean total cost.
-\item \code{sd_cost_ref}, \code{sd_cost_alt}: Standard deviations of cost.
-\item \code{mean_eff_ref}, \code{mean_eff_alt}: Mean effectiveness.
-\item \code{sd_eff_ref}, \code{sd_eff_alt}: Standard deviations of effectiveness.
-\item \code{delta_cost}, \code{delta_effect}: Incremental values.
-\item \code{ICER}: Incremental Cost-Effectiveness Ratio.
-\item \code{NMB_*}: Net Monetary Benefit for each supplied WTP threshold.
+\item dataset identifiers and subgroup metadata,
+\item sample sizes per strategy,
+\item mean and standard deviation of costs and effectiveness,
+\item incremental outcomes (delta cost, delta effect),
+\item ICERs and NMBs at specified willingness-to-pay thresholds.
 }
 }
 \description{
-Produces descriptive statistics for each strategy comparison within one or
-several datasets. The function computes mean and standard deviation of cost
-and effectiveness, incremental values (delta cost, delta effect), the
-Incremental Cost-Effectiveness Ratio (ICER), and Net Monetary Benefit (NMB)
-for one reference strategy contrasted with alternative strategies.
+Produces descriptive (non-bootstrap) summary statistics for cost-effectiveness
+analyses by strategy comparison. This function computes sample sizes, mean
+and standard deviation of costs and effectiveness, incremental values
+(delta cost and delta effect), Incremental Cost-Effectiveness Ratios (ICERs),
+and Net Monetary Benefits (NMBs) for one reference strategy contrasted with
+alternative strategies.
 }
 \details{
-Subgroup variables, when provided, are processed independently. Subgroup
-levels are automatically normalized as factors:
+Unlike \code{\link{compute_icers}}, this function does not rely on resampling
+or uncertainty analysis. It is intended for descriptive reporting, baseline
+summaries, and tabular outputs commonly required in health economic
+evaluations and policy analyses.
+
+The function supports:
 \itemize{
-\item Numeric or integer levels are converted to ordered factors.
-\item Character levels preserve their observed order as unordered factors.
+\item single or multiple datasets representing alternative analytical
+scenarios (e.g. base case, discounted analyses),
+\item explicit subgroup analyses treated independently from the overall
+population,
+\item consistent summarization across strategies, subgroups and scenarios.
 }
 
-When applied to a list of datasets, summaries are computed for each
-dataset and aggregated in a single tidy tibble.
+When subgroup variables are provided, summaries are computed separately for
+each subgroup level in addition to the overall population. Subgroup levels
+are automatically normalized as factors to ensure consistent ordering and
+downstream processing.
+
+The returned tibble is designed to support descriptive tables and reporting,
+and is complementary to the bootstrap-based outputs generated by
+\code{\link{compute_icers}}. It can be used directly for tabular summaries
+or as input to custom reporting workflows.
+}
+\examples{
+## Example 1: Descriptive summary for a single dataset
+summary_base <- summarize_cea_data(
+  data      = cua_base,
+  group     = "group",
+  cost      = "cost_total",
+  effect    = "effect",
+  ref_group = "g0",
+  lambda    = c(20000, 30000)
+)
+
+head(summary_base)
+
+## Example 2: Multi-dataset summary with subgroup stratification
+data_list <- list(
+  base_case        = cua_multi,
+  discounted_case = cua_multi_discounted
+)
+
+summary_multi <- summarize_cea_data(
+  data          = data_list,
+  group         = "group",
+  cost          = "cost_total",
+  effect        = "effect",
+  subgroup_vars = c("diabetes", "HTA"),
+  ref_group     = "usual_care",
+  lambda        = c(20000)
+)
+
+dplyr::count(summary_multi, dataset)
+
 }

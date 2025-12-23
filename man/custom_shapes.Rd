@@ -2,29 +2,62 @@
 % Please edit documentation in R/custom_shapes.R
 \name{custom_shapes}
 \alias{custom_shapes}
-\title{Construct a Custom Shape and Linetype Specification}
+\title{Define Custom Shape and Linetype Palettes for CEAgroupR Plots}
 \usage{
 custom_shapes(shapes = NULL, linetypes = NULL)
 }
 \arguments{
-\item{shapes}{Optional numeric vector of ggplot2 shape codes
-(e.g., \code{c(16, 17, 15)}).}
+\item{shapes}{Optional numeric vector specifying ggplot2 shape codes
+to be used for point-based geometries. If \code{NULL}, default shapes
+are used.}
 
-\item{linetypes}{Optional numeric or character vector of ggplot2 linetype
-specifications (e.g., \code{c("solid", "dashed")} or \code{c(1, 2)}).}
+\item{linetypes}{Optional character or numeric vector specifying ggplot2
+line types to be used for line-based geometries (e.g. contours). If
+\code{NULL}, default linetypes are used.}
 }
 \value{
-An object of class \code{"cea_shapes"} containing the validated
-shape and linetype specifications.
+An object of class \code{"cea_shapes"} containing custom shape and/or
+linetype definitions for use in CEAgroupR plots.
 }
 \description{
-Creates a validated object defining custom shape and/or linetype values
-to be used by the CEAgroupR graphical engine. This constructor does not
-perform any aesthetic mapping or recycling; it only validates inputs and
-stores them in a structured object for later use.
+Constructs a custom shape and/or linetype palette to be used across
+graphical functions in the CEAgroupR package. This utility allows users
+to explicitly control the set of point shapes and line types used when
+grouping results by a given variable (e.g. dataset or subgroup).
 }
 \details{
-The resulting object is intended to be passed to graphical functions
-(e.g., \code{plot.ceacs}, \code{plot.icers}) via a dedicated argument and
-resolved internally by the plotting engine.
+Custom shape palettes are particularly useful in complex visualizations
+where default ggplot2 shapes or linetypes may be difficult to distinguish,
+such as multi-dataset or multi-subgroup analyses.
+
+The object returned by this function can be passed to graphical functions
+such as \code{\link{plot.icers}}, \code{\link{plot.ceacs}} and
+\code{\link{plot.evpis}} via the \code{shapes_palette} argument. Shape and
+linetype values are recycled if the number of groups exceeds the length
+of the supplied vectors.
+}
+\examples{
+## Define a custom set of shapes and linetypes
+my_shapes <- custom_shapes(
+  shapes    = c(16, 17, 15),
+  linetypes = c("solid", "dashed", "dotted")
+)
+
+## Use custom shapes in an ICER plane
+res <- compute_icers(
+  data      = cua_base,
+  group     = "group",
+  cost      = "cost_total",
+  effect    = "effect",
+  ref_group = "g0",
+  R         = 50,
+  seed      = 123
+)
+
+plot.icers(
+  res,
+  shape_by       = "dataset",
+  shapes_palette = my_shapes
+)
+
 }

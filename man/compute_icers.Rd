@@ -19,13 +19,116 @@ compute_icers(
   alt_groups = NULL
 )
 }
+\arguments{
+\item{data}{A data frame or a named list of data frames containing individual-level
+cost and effectiveness outcomes. When a list is supplied, each element is
+treated as a separate dataset representing a distinct analytical scenario
+(e.g. base case, discounted scenario).}
+
+\item{group}{Character string specifying the variable that identifies
+the intervention or strategy group.}
+
+\item{cost}{Character string specifying the cost variable.}
+
+\item{effect}{Character string specifying the effectiveness variable
+(e.g. QALYs or other health outcomes).}
+
+\item{R}{Integer specifying the number of bootstrap replications.}
+
+\item{lambda}{Numeric vector of willingness-to-pay thresholds used to compute
+Net Monetary Benefits (NMBs).}
+
+\item{ci_type}{Character string specifying the type of bootstrap confidence
+interval to compute. Passed to \code{\link[boot]{boot.ci}} (e.g. \code{"bca"},
+\code{"perc"}).}
+
+\item{subgroup_vars}{Optional character vector specifying one or more
+subgroup variables. When provided, analyses are conducted separately
+for each subgroup level in addition to the overall population.}
+
+\item{seed}{Optional integer seed for reproducibility of bootstrap resampling.}
+
+\item{verbose}{Logical; if \code{TRUE}, prints a compact global progress
+indicator across all bootstrap iterations.}
+
+\item{ref_group}{Character string identifying the reference strategy
+against which all incremental comparisons are computed.}
+
+\item{alt_groups}{Optional character vector specifying which alternative
+strategies should be compared with the reference. If \code{NULL}, all
+non-reference strategies observed in the data are used.}
+}
+\value{
+An object of class \code{cea_results_list} containing, for each dataset:
+\itemize{
+\item overall and subgroup-specific bootstrap results,
+\item combined bootstrap replicates in tidy format,
+\item descriptive summary statistics,
+\item analysis settings and metadata.
+}
+}
 \description{
-Implements a nonparametric bootstrap procedure to estimate incremental cost,
-incremental effectiveness, ICERs and NMBs for one reference strategy versus
-alternatives, supporting multi-dataset and subgroup-based analyses.
+Core analytical function of the CEAgroupR package. This function implements
+a nonparametric bootstrap framework to estimate incremental costs,
+incremental effects, Incremental Cost-Effectiveness Ratios (ICERs),
+and Net Monetary Benefits (NMBs) for one reference strategy compared
+against one or multiple alternative strategies.
 }
 \details{
-Subgroup variables are normalized automatically. When verbose = TRUE, the
-function prints global progress (0–100\%) accumulated across all bootstrap
-iterations, with dataset and subgroup headers.
+The function is designed to support complex evaluation settings commonly
+encountered in health economic and policy analyses, including:
+\itemize{
+\item multi-strategy incremental comparisons,
+\item multiple datasets representing alternative analytical scenarios
+(e.g. base case, discounted analyses, scenario and sensitivity analyses),
+\item explicit subgroup analyses treated as a first-class analytical component.
+}
+
+When multiple datasets are supplied, each dataset is analysed independently
+following an identical analytical pipeline, enabling consistent comparison
+across scenarios while preserving full traceability of results.
+
+Nonparametric bootstrap resampling is performed within each dataset,
+strategy comparison and subgroup stratum. When subgroup variables are
+provided, analyses are conducted separately for each subgroup level in
+addition to the overall population.
+
+When \code{verbose = TRUE}, the function reports a compact global progress
+indicator (0--100\\%) across all bootstrap iterations, including dataset
+and subgroup-level headers.
+
+The returned object contains both raw bootstrap replicates and
+pre-computed summaries, and is structured to be directly compatible with
+all graphical and post-processing functions provided by CEAgroupR.
+This design ensures full traceability and reproducibility of results
+across strategies, subgroups and analytical scenarios.
+}
+\examples{
+## Example 1: Basic cost-effectiveness analysis (single dataset)
+res_base <- compute_icers(
+  data      = cua_base,
+  group     = "group",
+  cost      = "cost_total",
+  effect    = "effect",
+  ref_group = "g0",
+  R         = 50,
+  seed      = 123
+)
+
+## Example 2: Multi-dataset analysis (base case and discounted scenario)
+data_list <- list(
+  base_case        = cua_multi,
+  discounted_case = cua_multi_discounted
+)
+
+res_multi <- compute_icers(
+  data      = data_list,
+  group     = "group",
+  cost      = "cost_total",
+  effect    = "effect",
+  ref_group = "usual_care",
+  R         = 50,
+  seed      = 123
+)
+
 }

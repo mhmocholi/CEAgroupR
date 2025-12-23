@@ -1,22 +1,53 @@
 #' Print Method for \code{cea_results} Objects
 #'
-#' Displays a structured overview of cost-effectiveness bootstrap results
-#' stored within a \code{cea_results} object. The output includes both
-#' overall comparisons and subgroup-specific results, when applicable.
+#' Provides a structured, human-readable overview of cost-effectiveness
+#' analysis results stored in a \code{cea_results} object. This print method
+#' summarizes bootstrap-based outcomes for both overall population analyses
+#' and subgroup-specific analyses, when available.
 #'
-#' The reference strategy is obtained from the internal analysis settings
-#' stored in each underlying comparison object (as attached by
-#' \code{compute_icers}). Comparison labels correspond to the name of the
-#' alternative strategy only, following the standardized conventions used
-#' across the analytical layer.
+#' The printed output is intended for quick inspection and interactive use,
+#' and is not designed to replace formal tabular summaries or graphical
+#' visualizations. Reference strategy information is retrieved from the
+#' internal analysis settings attached by \code{\link{compute_icers}}.
+#'
+#' Although primarily intended as an internal print method, this function
+#' can also be called explicitly by users to control the formatting of the
+#' output, in particular the number of decimal places displayed.
+#'
+#' Comparison labels correspond to alternative strategies only, following
+#' the standardized conventions used throughout the analytical layer of
+#' CEAgroupR.
 #'
 #' @param x An object of class \code{cea_results}.
 #' @param digits Integer specifying the number of decimal places to display.
 #'   Default is 3.
 #' @param ... Additional arguments (unused).
 #'
-#' @return Invisibly returns \code{x}.
+#' @details
+#' This method is automatically invoked when a \code{cea_results} object
+#' is printed to the console. It provides a concise summary of key
+#' bootstrap-based estimates to facilitate exploratory analysis and
+#' diagnostic checks during interactive workflows.
+#'
+#' @return
+#' Invisibly returns \code{x}.
+#'
+#' @examples
+#' ## Example: Print results with increased numeric precision
+#' res <- compute_icers(
+#'   data      = cua_base,
+#'   group     = "group",
+#'   cost      = "cost_total",
+#'   effect    = "effect",
+#'   ref_group = "g0",
+#'   R         = 50,
+#'   seed      = 123
+#' )
+#'
+#' print(res[[1]], digits = 5)
+#'
 #' @export
+
 print.cea_results <- function(x, digits = 3, ...) {
 
   # Retrieve reference strategy -------------------------------------------------

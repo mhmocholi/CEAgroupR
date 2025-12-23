@@ -7,9 +7,10 @@
 \method{print}{cea_base}(x, digits = 3, ...)
 }
 \arguments{
-\item{x}{An object of class \code{cea_base}.}
+\item{x}{An object of class \code{cea_base}, representing a single
+strategy comparison.}
 
-\item{digits}{Integer indicating the number of decimal places to display.
+\item{digits}{Integer specifying the number of decimal places to display.
 Default is 3.}
 
 \item{...}{Additional arguments (unused).}
@@ -18,14 +19,42 @@ Default is 3.}
 Invisibly returns \code{x}.
 }
 \description{
-Displays a formatted summary of bootstrap results for a single
-cost-effectiveness comparison between the reference strategy and one
-alternative strategy. The output includes original estimates,
+Displays a formatted summary of bootstrap-based cost-effectiveness results
+for a single incremental comparison between a reference strategy and one
+alternative strategy. The printed output includes original estimates,
 bootstrap means, bias, and percentile-based confidence intervals when
 available.
 }
 \details{
+This method is intended for detailed inspection of a specific comparison
+extracted from a broader cost-effectiveness analysis, and complements the
+higher-level summaries provided by \code{print.cea_results}.
+
 The reference strategy is retrieved from the internal analysis settings
-attached to the object by \code{compute_icers}. The alternative strategy
-corresponds to the comparison stored in the \code{cea_base} object.
+attached to the object by \code{\link{compute_icers}}. The alternative
+strategy corresponds to the comparison stored in the \code{cea_base} object.
+
+Although primarily designed as an internal print method, this function can
+also be called explicitly by users to control the formatting of the output,
+in particular the number of decimal places displayed.
+
+This method is automatically invoked when a \code{cea_base} object is printed
+to the console. It is most commonly accessed by extracting a single
+comparison from a \code{cea_results} object.
+}
+\examples{
+## Example: Inspect a single comparison with higher precision
+res <- compute_icers(
+  data      = cua_base,
+  group     = "group",
+  cost      = "cost_total",
+  effect    = "effect",
+  ref_group = "g0",
+  R         = 50,
+  seed      = 123
+)
+
+## Extract and print one comparison
+print(res[[1]][["g1"]], digits = 4)
+
 }

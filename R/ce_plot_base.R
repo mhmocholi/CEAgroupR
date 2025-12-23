@@ -1,49 +1,47 @@
-#' Internal Layout Constructor for Cost-Effectiveness Visualizations
+#' Internal Graphical Layout Engine for CEAgroupR Visualizations
 #'
-#' Provides the unified aesthetic and layout engine used across all
-#' CEAgroupR graphical functions. This internal utility ensures consistent
-#' handling of colour mapping, optional shape/linetype mapping, faceting,
-#' palette resolution, and legend behaviour. It returns an initialized
-#' \code{ggplot2} object along with all internally resolved aesthetic
-#' components needed by downstream plotting functions.
+#' Internal utility function that constructs the base \code{ggplot2} object
+#' and resolves common aesthetic mappings used across all graphical functions
+#' in the CEAgroupR package. This function ensures consistent handling of
+#' colour, shape and linetype mappings, palette resolution, faceting rules
+#' and legend behaviour.
 #'
-#' The function does not apply defaults for \code{color_by},
-#' \code{shape_by} or \code{facet_by}. Calling functions must supply these
-#' explicitly to maintain transparency and reproducibility of aesthetic
-#' mappings.
+#' This function is not intended to be called directly by users. It is used
+#' internally by \code{plot.icers}, \code{plot.ceacs}, \code{plot.evpis} and
+#' \code{plot.marginals} to provide a unified graphical backbone.
 #'
-#' @param data A tibble produced by \code{combine_icers_results}.
-#' @param color_by Character string giving the variable mapped to colour,
+#' @param data A tibble containing bootstrap replicates or derived quantities
+#'   used for plotting.
+#'
+#' @param color_by Character string specifying the variable mapped to colour,
 #'   or \code{"none"} to disable colour mapping.
-#' @param shape_by Character string giving the variable mapped to point
-#'   shape and linetype, or \code{"none"} to disable shape/linetype mapping.
-#' @param facet_by Character string defining the faceting directive
-#'   (e.g., \code{"dataset"}, \code{"comparison"}, \code{"subgroup"},
-#'   \code{"subgroup_var"}, \code{"subgroup_level"}). Use \code{"none"} to
-#'   disable faceting.
-#' @param filter_expr Optional character string containing a tidyverse-style
-#'   filter expression applied to \code{data}.
-#' @param facet_scales Value passed to \code{ggplot2} facet functions
-#'   (default: \code{"fixed"}).
-#' @param palette A named vector of colours or a palette name recognized by
-#'   \code{RColorBrewer}. Defaults to \code{"Dark2"}.
-#' @param shapes_palette Optional object of class \code{"cea_shapes"}
-#'   defining custom shape and/or linetype values.
-#' @param theme_base A \code{ggplot2} theme applied to the base plot.
-#'   Defaults to \code{ggplot2::theme_bw()}.
-#' @param auto_layout Ignored. Retained for backward compatibility.
 #'
-#' @return A list containing:
-#' \itemize{
-#'   \item \code{plot}: Initialized \code{ggplot} object.
-#'   \item \code{data}: Filtered input data.
-#'   \item \code{color_var}: Resolved colour aesthetic variable.
-#'   \item \code{shape_var}: Resolved shape/linetype variable.
-#'   \item \code{linetype_values}: Named vector of linetype patterns.
-#'   \item \code{shape_values}: Named vector of point shapes.
-#'   \item \code{palette_values}: Resolved colour palette.
-#'   \item \code{group_var}: Internal grouping variable used for layers.
-#' }
+#' @param shape_by Character string specifying the variable mapped to point
+#'   shape (and, where applicable, line type), or \code{"none"} to disable
+#'   shape-based grouping.
+#'
+#' @param facet_by Character string specifying the faceting directive, or
+#'   \code{"none"} to disable faceting.
+#'
+#' @param filter_expr Optional tidyverse-style filtering expression applied
+#'   to the input data prior to plotting.
+#'
+#' @param facet_scales Character string specifying facet scaling behaviour
+#'   (e.g. \code{"fixed"} or \code{"free"}), passed to \code{ggplot2}.
+#'
+#' @param palette Colour palette name or vector used for colour mapping.
+#'
+#' @param shapes_palette Optional object of class \code{"cea_shapes"} defining
+#'   custom shape and linetype values.
+#'
+#' @param theme_base A \code{ggplot2} theme applied to the base plot.
+#'
+#' @param auto_layout Logical; retained for backward compatibility. Currently
+#'   ignored.
+#'
+#' @return
+#' A list containing the initialized \code{ggplot} object and resolved
+#' aesthetic components required by downstream plotting functions.
 #'
 #' @noRd
 ce_plot_base <- function(
