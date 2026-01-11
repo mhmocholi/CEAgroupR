@@ -134,5 +134,4 @@ plot.icers(
   mode          = "Subgroups",
   facet_by      = "subgroup"
 )
-
 }

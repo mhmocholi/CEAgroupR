@@ -71,7 +71,7 @@
 #'     linetypes = c("dashed", "dotted")
 #'   )
 #' )
-#'
+#' @export plot.marginals
 #' @export
 plot.marginals <- function(
     data,

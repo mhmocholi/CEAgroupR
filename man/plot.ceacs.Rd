@@ -127,5 +127,4 @@ plot.ceacs(
   mode     = "Subgroups",
   facet_by = "subgroup"
 )
-
 }

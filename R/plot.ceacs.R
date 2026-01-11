@@ -67,7 +67,7 @@
 #'   mode     = "Subgroups",
 #'   facet_by = "subgroup"
 #' )
-#'
+#' @export plot.ceacs
 #' @export
 plot.ceacs <- function(
     data,

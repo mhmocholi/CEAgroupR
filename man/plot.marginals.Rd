@@ -125,5 +125,4 @@ plot.marginals(
     linetypes = c("dashed", "dotted")
   )
 )
-
 }

@@ -58,7 +58,7 @@
 #'   mode     = "Subgroups",
 #'   facet_by = "subgroup"
 #' )
-#'
+#' @export plot.evpis
 #' @export
 plot.evpis <- function(
     data,

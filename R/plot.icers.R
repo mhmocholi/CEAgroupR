@@ -108,7 +108,7 @@
 #'   mode          = "Subgroups",
 #'   facet_by      = "subgroup"
 #' )
-#'
+#' @export plot.icers
 #' @export
 plot.icers <- function(
     data,
