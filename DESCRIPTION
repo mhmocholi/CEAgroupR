@@ -31,7 +31,8 @@ Imports:
     scales,
     grDevices,
     stats,
-    utils
+    utils,
+    magrittr
 Suggests:
     rmarkdown,
     knitr,
@@ -41,4 +42,4 @@ VignetteBuilder: knitr
 Config/testthat/edition: 3
 LazyData: true
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.3
+Config/roxygen2/version: 8.1.1

@@ -108,6 +108,7 @@
 #'   mode          = "Subgroups",
 #'   facet_by      = "subgroup"
 #' )
+#' @importFrom magrittr %>%
 #' @export plot.icers
 #' @export
 plot.icers <- function(
