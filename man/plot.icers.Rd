@@ -127,11 +127,10 @@ res <- compute_icers(
 
 plot.icers(res)
 
-## Example 2: ICER plane with contours and subgroup stratification
+## Example 2: ICER plane with contours
 plot.icers(
   res,
-  show_contours = TRUE,
-  mode          = "Subgroups",
-  facet_by      = "subgroup"
+  show_contours = TRUE
 )
+
 }
