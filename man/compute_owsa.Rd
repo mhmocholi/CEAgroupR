@@ -4,43 +4,53 @@
 \alias{compute_owsa}
 \title{Compute One-Way Deterministic Sensitivity Analysis (OWSA)}
 \usage{
-compute_owsa(data, group, cost, effect, ref, parameters, lambda = 25000)
+compute_owsa(
+  data,
+  group,
+  cost,
+  effect,
+  ref,
+  parameters,
+  lambda = 25000,
+  subgroup_vars = NULL
+)
 }
 \arguments{
-\item{data}{A data frame containing individual-level costs, effects,
-resource utilization and strategy identifiers.}
+\item{data}{A data frame or a named list of data frames containing
+individual-level costs, effects, resource utilization and strategies.}
 
 \item{group}{Character string specifying the strategy grouping variable.}
 
 \item{cost}{Character string specifying the individual-level cost variable.}
 
-\item{effect}{Character string specifying the individual-level effectiveness
-variable (e.g. QALYs).}
+\item{effect}{Character string specifying the effectiveness variable.}
 
-\item{ref}{Character string identifying the reference strategy against
-which incremental comparisons are computed.}
+\item{ref}{Character string identifying the reference strategy.}
 
 \item{parameters}{A data frame containing the parameters to be varied.
 The following columns are required:
 \itemize{
 \item \code{parameter}: parameter identifier.
-\item \code{resource}: corresponding resource utilization variable
-in \code{data}.
+\item \code{resource}: corresponding resource utilization variable.
 \item \code{base}: baseline unit cost.
 \item \code{lower}: lower parameter value.
 \item \code{upper}: upper parameter value.
 }}
 
-\item{lambda}{Numeric willingness-to-pay threshold used to calculate
-incremental NMB. Defaults to 25000.}
+\item{lambda}{Numeric vector of willingness-to-pay thresholds used
+to calculate incremental NMBs. Defaults to 25000.}
+
+\item{subgroup_vars}{Optional character vector specifying subgroup
+variables. Overall and subgroup-specific results are calculated.}
 }
 \value{
 An object of class \code{owsa_result} containing:
 \itemize{
-\item \code{sensitivity_results}: a data frame containing scenario-specific
-mean costs, mean effects, incremental costs, incremental effects,
-ICERs and incremental NMBs for each alternative strategy.
-\item \code{parameters}: the parameter specification table.
+\item One element per dataset, with \code{Overall} and
+\code{Subgroups} components containing scenario-specific
+economic results.
+\item \code{sensitivity_results}: consolidated results table.
+\item \code{parameters}: parameter specification table.
 \item \code{settings}: analysis settings and metadata.
 }
 }
@@ -59,26 +69,27 @@ variable. Alternative costs are calculated by adjusting the original
 individual costs according to the difference between the scenario-specific
 and baseline unit costs.
 
-The function supports multiple parameters and multiple intervention
-strategies compared against a common reference strategy.
+The function supports multiple datasets, intervention strategies,
+subgroup analyses and willingness-to-pay thresholds.
 
-For each parameter, three scenarios are evaluated: baseline, lower
+Results are organized hierarchically by dataset, overall population
+and subgroup, while also providing a consolidated results table.
+
+Three scenarios are evaluated for each parameter: baseline, lower
 and upper. Only one parameter is varied at a time.
 
 Individual-level costs are recalculated as:
 \deqn{C_{i,new} = C_{i,base} + R_i(P_{new} - P_{base})}
 
-where \eqn{R_i} represents individual resource utilization and
-\eqn{P} represents the corresponding unit cost.
+Incremental NMB is calculated separately for each threshold:
+\deqn{NMB(\lambda) = \lambda \Delta E - \Delta C}
+
+NMB columns follow the same naming convention as compute_icers():
+NMB_15000, NMB_25000, etc.
 
 The analysis is deterministic and does not perform bootstrap resampling.
-Consequently, the resulting scenarios describe parameter sensitivity
-rather than sampling uncertainty.
-
-Results can be visualized using \code{\link{plot.tornado}}.
 }
 \examples{
-## Example 1: One-way sensitivity analysis of healthcare unit costs
 owsa_parameters <- data.frame(
   parameter = c("gp_visit", "specialist_visit", "hospital_day"),
   resource  = c("gp_visits", "specialist_visits", "hospital_days"),
@@ -93,9 +104,8 @@ res_owsa <- compute_owsa(
   cost       = "cost_total",
   effect     = "effect",
   ref        = "usual_care",
-  parameters = owsa_parameters
+  parameters = owsa_parameters,
+  lambda     = c(15000, 25000, 35000)
 )
-
-res_owsa$sensitivity_results
 
 }
