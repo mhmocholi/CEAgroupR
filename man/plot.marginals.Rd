@@ -11,6 +11,7 @@
   color_by = NULL,
   shape_by = NULL,
   facet_by = NULL,
+  plot_by = NULL,
   mode = "Overall",
   filter_expr = NULL,
   facet_scales = "fixed",
@@ -22,8 +23,7 @@
 }
 \arguments{
 \item{data}{Either the output of \code{\link{compute_icers}} or a tibble
-produced by \code{\link{combine_icers_results}} containing bootstrap
-replicates.}
+produced by \code{\link{combine_icers_results}}.}
 
 \item{variable}{Character string specifying which marginal distribution
 to display. Must be either \code{"cost"} (for \code{Delta_Cost}) or
@@ -33,32 +33,29 @@ to display. Must be either \code{"cost"} (for \code{Delta_Cost}) or
 the distribution. Supported values are \code{"histogram"},
 \code{"density"}, and \code{"boxplot"}.}
 
-\item{color_by}{Character string specifying the variable used for colour
-mapping. Use \code{"none"} to disable colour mapping. Defaults to
-\code{"comparison"}.}
+\item{color_by}{Variable used for colour mapping. \code{NULL} defaults to
+\code{"comparison"}; \code{"none"} disables mapping.}
 
-\item{shape_by}{Character string specifying the variable used for point
-shape mapping. Use \code{"none"} to disable shape mapping. Defaults to
-\code{"dataset"}.}
+\item{shape_by}{Variable used for point shapes. \code{NULL} defaults to
+\code{"dataset"}; \code{"none"} disables mapping.}
 
-\item{facet_by}{Character string defining the faceting directive. Supported
-values include \code{"dataset"}, \code{"comparison"},
-\code{"subgroup_var"}, \code{"subgroup_level"}, or \code{"subgroup"} to
-construct a grid of subgroup-variable by subgroup-level. Use
-\code{"none"} to disable faceting.}
+\item{facet_by}{Faceting directive: \code{"dataset"}, \code{"comparison"},
+\code{"subgroup_var"}, \code{"subgroup_level"}, or \code{"subgroup"}.
+\code{NULL} defaults to \code{"none"} in Overall mode and
+\code{"subgroup"} in Subgroups mode.}
 
-\item{mode}{Character string specifying whether to display results for the
-overall population (\code{"Overall"}) or subgroup-specific analyses
-(\code{"Subgroups"}).}
+\item{plot_by}{Dimension used to generate independent plots:
+\code{"dataset"}, \code{"comparison"}, \code{"subgroup_var"}, or
+\code{"subgroup_level"}. \code{NULL} or \code{"none"} produces a
+single combined plot.}
 
-\item{filter_expr}{Optional tidyverse-style filtering expression applied to
-the underlying bootstrap replicates prior to plotting.}
+\item{mode}{Either \code{"Overall"} or \code{"Subgroups"}.}
 
-\item{facet_scales}{Character string specifying whether facet scales are
-fixed or free (passed to \code{ggplot2}).}
+\item{filter_expr}{Optional tidyverse-style filtering expression.}
 
-\item{palette}{Colour palette name or vector passed to
-\code{\link{ce_plot_base}}.}
+\item{facet_scales}{Facet scale behaviour passed to \code{ggplot2}.}
+
+\item{palette}{Colour palette name or vector.}
 
 \item{shapes_palette}{Optional object of class \code{"cea_shapes"} defining
 custom linetype values for grouped marginal distributions.}
@@ -66,12 +63,12 @@ custom linetype values for grouped marginal distributions.}
 \item{bins}{Integer specifying the number of bins used for the histogram
 geometry.}
 
-\item{...}{Additional graphical parameters passed to point layers
-(e.g. \code{alpha}, \code{size}).}
+\item{...}{Additional point parameters, such as \code{alpha} and \code{size}.}
 }
 \value{
 A \code{ggplot} object representing the marginal distribution of the
-selected incremental outcome.
+selected incremental outcome, or a \code{cea_multplots} object when
+\code{plot_by} is specified.
 }
 \description{
 Visualizes marginal distributions of incremental cost
@@ -83,19 +80,23 @@ incremental cost-effectiveness plane.
 }
 \details{
 The function supports multiple geometries, including histograms, kernel
-density estimates and boxplots. It is designed to facilitate inspection of
-the distributional shape, spread and asymmetry of incremental outcomes
-across strategies, datasets and subgroups.
+density estimates and boxplots. It facilitates inspection of distributional
+shape, spread and asymmetry across strategies, datasets and subgroups.
 
 The function adheres to the unified graphical conventions of CEAgroupR,
-ensuring consistent colour mapping, palette handling, faceting behaviour
-and legend logic across all visualization functions.
+ensuring consistent colour mapping, palette handling, faceting behaviour,
+plot grouping and legend logic across visualization functions.
 
 Marginal distributions are useful for exploring the uncertainty of costs
 or effects independently, identifying skewness, multimodality or extreme
-values that may not be immediately apparent in joint plots. This function
-is typically used alongside \code{\link{plot.icers}} to provide complementary
-perspectives on uncertainty.
+values that may not be immediately apparent in joint plots.
+
+When \code{plot_by} is specified, separate plots are generated for each
+level of the selected grouping variable. The global aesthetic mappings
+are preserved across plots and the results are managed through
+\code{cea_multplots_handler}.
+
+The \code{shape_by} argument controls line type rather than point shape.
 }
 \examples{
 ## Example 1: Marginal distribution of incremental costs
@@ -115,14 +116,23 @@ plot.marginals(
   geom_type = "density"
 )
 
-## Example 2: Marginal effects by dataset with custom linetypes
+## Example 2: Marginal effects with custom linetypes
 plot.marginals(
   res,
-  variable        = "effect",
-  geom_type       = "density",
-  shape_by        = "dataset",
-  shapes_palette  = custom_shapes(
+  variable       = "effect",
+  geom_type      = "density",
+  shape_by       = "dataset",
+  shapes_palette = custom_shapes(
     linetypes = c("dashed", "dotted")
   )
 )
+
+## Example 3: Separate marginal distributions by dataset
+plot.marginals(
+  res,
+  variable  = "cost",
+  geom_type = "histogram",
+  plot_by   = "dataset"
+)
+
 }

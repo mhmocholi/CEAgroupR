@@ -46,8 +46,9 @@
 #'   seed      = 123
 #' )
 #'
-#' plot.icers(
+#' plot(
 #'   res,
+#'   type           = "icers",
 #'   shape_by       = "dataset",
 #'   shapes_palette = my_shapes
 #' )

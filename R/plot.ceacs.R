@@ -1,3 +1,4 @@
+
 #' Plot Cost-Effectiveness Acceptability Curves (CEAC)
 #'
 #' Produces Cost-Effectiveness Acceptability Curves (CEACs) based on bootstrap
@@ -15,6 +16,11 @@
 #' colour and line-type mappings.
 #'
 #' @inheritParams plot.icers
+#'
+#' @param plot_by Optional variable used to generate separate CEAC plots.
+#'   If \code{NULL} or \code{"none"}, a single ggplot object is returned.
+#'   Otherwise, plots are grouped and returned through
+#'   \code{cea_multplots_handler}.
 #'
 #' @param lambda_max Numeric value specifying the maximum willingness-to-pay
 #'   threshold displayed on the x-axis. If \code{NULL}, a heuristic based on the
@@ -38,13 +44,15 @@
 #' @details
 #' This function relies on the internal plotting engine
 #' \code{\link{ce_plot_base}} to ensure consistent aesthetics and behaviour
-#' across all CEAgroupR visualizations. It is commonly used alongside
-#' \code{\link{plot.icers}} to provide complementary perspectives on
-#' uncertainty and decision-making.
+#' across all CEAgroupR visualizations.
+#'
+#' When \code{plot_by} is specified, the CEAC data are calculated globally
+#' before being separated into individual plots. This ensures that all
+#' resulting plots share the same WTP evaluation grid.
 #'
 #' @return
-#' A \code{ggplot} object representing the cost-effectiveness acceptability
-#' curves, or a tidy data frame containing CEAC values when
+#' A \code{ggplot} object, a \code{cea_multplots} object when
+#' \code{plot_by} is specified, or a tidy data frame when
 #' \code{return_data = TRUE}.
 #'
 #' @examples
@@ -59,21 +67,42 @@
 #'   seed      = 123
 #' )
 #'
-#' plot.ceacs(res)
+#' plot(res, type = "ceacs")
 #'
 #' ## Example 2: CEAC with subgroup stratification
-#' plot.ceacs(
-#'   res,
+#' res_subgroups <- compute_icers(
+#'   data          = cua_base,
+#'   group         = "group",
+#'   cost          = "cost_total",
+#'   effect        = "effect",
+#'   ref_group     = "g0",
+#'   subgroup_vars = "diabetes",
+#'   R             = 50,
+#'   seed          = 123
+#' )
+#'
+#' plot(
+#'   res_subgroups,
+#'   type     = "ceacs",
 #'   mode     = "Subgroups",
 #'   facet_by = "subgroup"
 #' )
-#' @export plot.ceacs
+#'
+#' ## Example 3: Separate CEAC plots by dataset
+#' plot(
+#'   res,
+#'   type    = "ceacs",
+#'   plot_by = "dataset"
+#' )
+#'
 #' @export
+#' @rawNamespace export(plot.ceacs)
 plot.ceacs <- function(
     data,
     color_by = NULL,
     shape_by = NULL,
     facet_by = NULL,
+    plot_by = NULL,
     mode = "Overall",
     filter_expr = NULL,
     facet_scales = "fixed",
@@ -106,7 +135,9 @@ plot.ceacs <- function(
     df <- data
     default_lambdas <- NULL
 
-  } else stop("Input must be a cea_results_list or a data frame.")
+  } else {
+    stop("Input must be a cea_results_list or a data frame.")
+  }
 
   if (!"group_uid" %in% names(df)) {
     df$group_uid <- with(
@@ -136,6 +167,9 @@ plot.ceacs <- function(
     df <- df[df$subgroup_var != "Overall" & !is.na(df$subgroup_var), ]
   }
 
+  if (nrow(df) == 0L)
+    stop("No observations available after filtering and mode selection.")
+
   # ===========================================================================
   # 4. Lambda grid
   # ===========================================================================
@@ -152,6 +186,7 @@ plot.ceacs <- function(
   }
 
   lambda_seq <- seq(0, lambda_max, length.out = lambda_steps)
+
   if (is.null(lambdas))
     lambdas <- default_lambdas
 
@@ -164,7 +199,10 @@ plot.ceacs <- function(
       prob   = sapply(
         lambda_seq,
         function(l)
-          mean(sub_df$Delta_Cost < l * sub_df$Delta_Effect, na.rm = TRUE)
+          mean(
+            sub_df$Delta_Cost < l * sub_df$Delta_Effect,
+            na.rm = TRUE
+          )
       )
     )
   }
@@ -174,9 +212,15 @@ plot.ceacs <- function(
     dplyr::group_modify(~ compute_ceac(.x)) %>%
     dplyr::ungroup() %>%
     dplyr::left_join(
-      df %>% dplyr::select(
-        group_uid, dataset, subgroup_var, subgroup_level, comparison
-      ) %>% dplyr::distinct(),
+      df %>%
+        dplyr::select(
+          group_uid,
+          dataset,
+          subgroup_var,
+          subgroup_level,
+          comparison
+        ) %>%
+        dplyr::distinct(),
       by = "group_uid"
     )
 
@@ -184,28 +228,31 @@ plot.ceacs <- function(
     return(ceac_df)
 
   # ===========================================================================
-  # 6. Defaults for aesthetics
+  # 6. Defaults for aesthetics and plot grouping
   # ===========================================================================
-  default_color  <- "comparison"
-  default_shape  <- "dataset"
-  default_facet  <- if (mode == "Subgroups") "subgroup" else "none"
+  default_color <- "comparison"
+  default_shape <- "dataset"
+  default_facet <- if (mode == "Subgroups") "subgroup" else "none"
 
   resolved_color <- color_by %||% default_color
   resolved_shape <- shape_by %||% default_shape
   resolved_facet <- facet_by %||% default_facet
+  resolved_plot  <- plot_by
 
   if (identical(color_by, "none")) resolved_color <- NULL
-  if (identical(shape_by,  "none")) resolved_shape <- NULL
-  if (identical(facet_by,  "none")) resolved_facet <- NULL
+  if (identical(shape_by, "none")) resolved_shape <- NULL
+  if (identical(facet_by, "none")) resolved_facet <- NULL
+  if (identical(plot_by,  "none")) resolved_plot  <- NULL
 
   # ===========================================================================
-  # 7. Base layout (ce_plot_base)
+  # 7. Global layout and aesthetics (ce_plot_base)
   # ===========================================================================
   base <- ce_plot_base(
     data           = ceac_df,
     color_by       = resolved_color,
     shape_by       = resolved_shape,
-    facet_by       = resolved_facet,
+    facet_by       = "none",
+    plot_by        = resolved_plot,
     facet_scales   = facet_scales,
     palette        = palette,
     shapes_palette = shapes_palette
@@ -213,128 +260,229 @@ plot.ceacs <- function(
 
   color_var        <- base$color_var
   shape_var        <- base$shape_var
-  palette_values  <- base$palette_values
-  linetype_values <- base$linetype_values
-  theme_ceac      <- base$plot$theme
-  facet_layer     <- base$plot$facet
+  plot_var         <- base$plot_var
+  plot_levels      <- base$plot_levels
+  palette_values   <- base$palette_values
+  linetype_values  <- base$linetype_values
+  theme_ceac       <- base$plot$theme
 
   # ===========================================================================
-  # 8. Build CEAC plot base
+  # 8. Resolve faceting independently of plot_by
   # ===========================================================================
-  p <- ggplot2::ggplot(
-    ceac_df,
-    ggplot2::aes(x = lambda, y = prob)
-  ) +
-    theme_ceac
+  facet_layer <- NULL
 
-  if (inherits(facet_layer, "ggproto"))
-    p <- p + facet_layer
+  if (!is.null(resolved_facet)) {
 
-  # ===========================================================================
-  # 9. Aesthetic mapping for CEAC lines
-  # ===========================================================================
-  aes_ceac <- ggplot2::aes(group = group_uid)
+    facet_base <- ce_plot_base(
+      data           = ceac_df,
+      color_by       = resolved_color,
+      shape_by       = resolved_shape,
+      facet_by       = resolved_facet,
+      plot_by        = NULL,
+      facet_scales   = facet_scales,
+      palette        = palette,
+      shapes_palette = shapes_palette
+    )
 
-  if (!is.null(color_var))
-    aes_ceac$colour <- rlang::sym(color_var)
-
-  if (!is.null(shape_var))
-    aes_ceac$linetype <- rlang::sym(shape_var)
-
-  # ===========================================================================
-  # 10. Scales BEFORE drawing
-  # ===========================================================================
-  if (!is.null(color_var))
-    p <- p + ggplot2::scale_colour_manual(values = palette_values)
-
-  if (!is.null(shape_var)) {
-    if (!is.null(linetype_values)) {
-      p <- p + ggplot2::scale_linetype_manual(values = linetype_values)
-    } else {
-      p <- p + ggplot2::scale_linetype_discrete()
-    }
+    facet_layer <- facet_base$plot$facet
   }
 
-  if (!is.null(color_var) &&
-      dplyr::n_distinct(ceac_df[[color_var]]) == 1)
-    p <- p + ggplot2::guides(colour = "none")
-
-  if (!is.null(shape_var) &&
-      dplyr::n_distinct(ceac_df[[shape_var]]) == 1)
-    p <- p + ggplot2::guides(linetype = "none")
-
   # ===========================================================================
-  # 11. CEAC lines
+  # 9. Additional graphical arguments
   # ===========================================================================
   args  <- list(...)
   lw    <- args$linewidth %||% 1
   alpha <- args$alpha %||% 1
 
-  p <- p +
-    ggplot2::geom_line(
-      data    = ceac_df,
-      mapping = aes_ceac,
-      linewidth = lw,
-      alpha     = alpha
-    )
-
-  # ===========================================================================
-  # 12. Probability reference lines
-  # ===========================================================================
-  if (!is.null(show_probabilities)) {
-
-    probs <- show_probabilities[is.finite(show_probabilities)]
-
-    for (pr in probs) {
-      p <- p +
-        ggplot2::geom_hline(
-          yintercept = pr,
-          colour = "grey40",
-          linetype = "dashed",
-          linewidth = 0.6
-        )
-    }
-  }
-
-  # ===========================================================================
-  # 13. Lambda vertical reference lines
-  # ===========================================================================
-  if (show_lambdas && !is.null(lambdas)) {
-    p <- p +
-      ggplot2::geom_vline(
-        xintercept = lambdas,
-        colour = "grey50",
-        linetype = "dashed",
-        linewidth = 0.6
-      )
-  }
-
-  # ===========================================================================
-  # 14. Axes formatting
-  # ===========================================================================
   x_breaks <- pretty(lambda_seq, 5)
+
   if (show_lambdas && !is.null(lambdas))
     x_breaks <- sort(unique(c(x_breaks, lambdas)))
 
   y_breaks <- c(0, 0.25, 0.5, 0.75, 1)
+
   if (!is.null(show_probabilities))
     y_breaks <- sort(unique(c(y_breaks, show_probabilities)))
 
-  p <- p +
-    ggplot2::scale_x_continuous(
-      breaks = x_breaks,
-      labels = scales::label_number(accuracy = 1)
-    ) +
-    ggplot2::scale_y_continuous(
-      limits = c(0, 1),
-      breaks = y_breaks,
-      labels = scales::label_number(accuracy = 0.01)
-    ) +
-    ggplot2::labs(
-      title = "Cost-Effectiveness Acceptability Curve (CEAC)",
-      x     = expression(Willingness * "-to-" * Pay ~ (lambda)),
-      y     = "Probability cost-effective"
-    )
+  # ===========================================================================
+  # 10. Internal CEAC plot builder
+  # ===========================================================================
+  build_plot <- function(plot_df, plot_label = NULL) {
 
-  return(p)
+    # ------------------------------------------------------------------------
+    # 10.1. Base plot
+    # ------------------------------------------------------------------------
+    p <- ggplot2::ggplot(
+      plot_df,
+      ggplot2::aes(x = lambda, y = prob)
+    ) +
+      theme_ceac
+
+    if (!is.null(facet_layer) &&
+        inherits(facet_layer, "ggproto")) {
+      p <- p + facet_layer
+    }
+
+    # ------------------------------------------------------------------------
+    # 10.2. CEAC line aesthetics
+    # ------------------------------------------------------------------------
+    aes_ceac <- ggplot2::aes(group = group_uid)
+
+    if (!is.null(color_var))
+      aes_ceac$colour <- rlang::sym(color_var)
+
+    if (!is.null(shape_var))
+      aes_ceac$linetype <- rlang::sym(shape_var)
+
+    # ------------------------------------------------------------------------
+    # 10.3. Scales
+    # ------------------------------------------------------------------------
+    if (!is.null(color_var)) {
+      p <- p +
+        ggplot2::scale_colour_manual(
+          values = palette_values
+        )
+    }
+
+    if (!is.null(shape_var)) {
+
+      if (!is.null(linetype_values)) {
+        p <- p +
+          ggplot2::scale_linetype_manual(
+            values = linetype_values
+          )
+      } else {
+        p <- p +
+          ggplot2::scale_linetype_discrete()
+      }
+    }
+
+    if (!is.null(color_var) &&
+        dplyr::n_distinct(plot_df[[color_var]]) == 1) {
+      p <- p + ggplot2::guides(colour = "none")
+    }
+
+    if (!is.null(shape_var) &&
+        dplyr::n_distinct(plot_df[[shape_var]]) == 1) {
+      p <- p + ggplot2::guides(linetype = "none")
+    }
+
+    # ------------------------------------------------------------------------
+    # 10.4. CEAC lines
+    # ------------------------------------------------------------------------
+    p <- p +
+      ggplot2::geom_line(
+        data      = plot_df,
+        mapping   = aes_ceac,
+        linewidth = lw,
+        alpha     = alpha
+      )
+
+    # ------------------------------------------------------------------------
+    # 10.5. Probability reference lines
+    # ------------------------------------------------------------------------
+    if (!is.null(show_probabilities)) {
+
+      probs <- show_probabilities[
+        is.finite(show_probabilities)
+      ]
+
+      for (pr in probs) {
+        p <- p +
+          ggplot2::geom_hline(
+            yintercept = pr,
+            colour     = "grey40",
+            linetype   = "dashed",
+            linewidth  = 0.6
+          )
+      }
+    }
+
+    # ------------------------------------------------------------------------
+    # 10.6. Lambda vertical reference lines
+    # ------------------------------------------------------------------------
+    if (show_lambdas && !is.null(lambdas)) {
+      p <- p +
+        ggplot2::geom_vline(
+          xintercept = lambdas,
+          colour     = "grey50",
+          linetype   = "dashed",
+          linewidth  = 0.6
+        )
+    }
+
+    # ------------------------------------------------------------------------
+    # 10.7. Axes and labels
+    # ------------------------------------------------------------------------
+    p <- p +
+      ggplot2::scale_x_continuous(
+        breaks = x_breaks,
+        labels = scales::label_number(accuracy = 1)
+      ) +
+      ggplot2::scale_y_continuous(
+        limits = c(0, 1),
+        breaks = y_breaks,
+        labels = scales::label_number(accuracy = 0.01)
+      ) +
+      ggplot2::labs(
+        title = "Cost-Effectiveness Acceptability Curve (CEAC)",
+        x     = expression(Willingness * "-to-" * Pay ~ (lambda)),
+        y     = "Probability cost-effective"
+      )
+
+    if (!is.null(plot_label)) {
+      p <- p +
+        ggplot2::labs(
+          subtitle = paste0(plot_var, ": ", plot_label)
+        )
+    }
+
+    return(p)
+  }
+
+  # ===========================================================================
+  # 11. Single plot
+  # ===========================================================================
+  if (is.null(plot_var)) {
+    return(build_plot(ceac_df))
+  }
+
+  # ===========================================================================
+  # 12. Multiple plots using plot_by
+  # ===========================================================================
+  plot_groups <- split(
+    ceac_df,
+    factor(
+      ceac_df[[plot_var]],
+      levels = plot_levels
+    ),
+    drop = TRUE
+  )
+
+  plots <- lapply(
+    names(plot_groups),
+    function(plot_label) {
+      build_plot(
+        plot_df    = plot_groups[[plot_label]],
+        plot_label = plot_label
+      )
+    }
+  )
+
+  names(plots) <- names(plot_groups)
+
+  # ===========================================================================
+  # 13. Multi-plot handler
+  # ===========================================================================
+  output <- structure(
+    plots,
+    class = c("cea_multplots", "list")
+  )
+
+  return(
+    cea_multplots_handler(
+      output,
+      plot_type = "CEAC"
+    )
+  )
 }

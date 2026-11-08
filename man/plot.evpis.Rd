@@ -9,6 +9,7 @@
   color_by = NULL,
   shape_by = NULL,
   facet_by = NULL,
+  plot_by = NULL,
   mode = "Overall",
   filter_expr = NULL,
   facet_scales = "fixed",
@@ -22,32 +23,29 @@
 }
 \arguments{
 \item{data}{Either the output of \code{\link{compute_icers}} or a tibble
-produced by \code{\link{combine_icers_results}} containing bootstrap
-replicates.}
+produced by \code{\link{combine_icers_results}}.}
 
-\item{color_by}{Character string specifying the variable used for colour
-mapping. Use \code{"none"} to disable colour mapping. Defaults to
-\code{"comparison"}.}
+\item{color_by}{Variable used for colour mapping. \code{NULL} defaults to
+\code{"comparison"}; \code{"none"} disables mapping.}
 
-\item{shape_by}{Character string specifying the variable used for point
-shape mapping. Use \code{"none"} to disable shape mapping. Defaults to
-\code{"dataset"}.}
+\item{shape_by}{Variable used for point shapes. \code{NULL} defaults to
+\code{"dataset"}; \code{"none"} disables mapping.}
 
-\item{facet_by}{Character string defining the faceting directive. Supported
-values include \code{"dataset"}, \code{"comparison"},
-\code{"subgroup_var"}, \code{"subgroup_level"}, or \code{"subgroup"} to
-construct a grid of subgroup-variable by subgroup-level. Use
-\code{"none"} to disable faceting.}
+\item{facet_by}{Faceting directive: \code{"dataset"}, \code{"comparison"},
+\code{"subgroup_var"}, \code{"subgroup_level"}, or \code{"subgroup"}.
+\code{NULL} defaults to \code{"none"} in Overall mode and
+\code{"subgroup"} in Subgroups mode.}
 
-\item{mode}{Character string specifying whether to display results for the
-overall population (\code{"Overall"}) or subgroup-specific analyses
-(\code{"Subgroups"}).}
+\item{plot_by}{Dimension used to generate independent plots:
+\code{"dataset"}, \code{"comparison"}, \code{"subgroup_var"}, or
+\code{"subgroup_level"}. \code{NULL} or \code{"none"} produces a
+single combined plot.}
 
-\item{filter_expr}{Optional tidyverse-style filtering expression applied to
-the underlying bootstrap replicates prior to plotting.}
+\item{mode}{Either \code{"Overall"} or \code{"Subgroups"}.}
 
-\item{facet_scales}{Character string specifying whether facet scales are
-fixed or free (passed to \code{ggplot2}).}
+\item{filter_expr}{Optional tidyverse-style filtering expression.}
+
+\item{facet_scales}{Facet scale behaviour passed to \code{ggplot2}.}
 
 \item{lambda_max}{Optional numeric value specifying the maximum
 willingness-to-pay threshold displayed on the x-axis. If \code{NULL},
@@ -57,21 +55,20 @@ ratios is used to provide a robust default.}
 \item{lambda_steps}{Integer specifying the number of WTP evaluation points
 used to compute EVPI values.}
 
-\item{palette}{Colour palette name or vector passed to
-\code{\link{ce_plot_base}}.}
+\item{palette}{Colour palette name or vector.}
 
-\item{shapes_palette}{Optional object of class \code{"cea_shapes"} defining
-custom shape values for point layers.}
+\item{shapes_palette}{Optional \code{"cea_shapes"} object.}
 
 \item{return_data}{Logical; if \code{TRUE}, returns a tidy data frame
 containing EVPI values instead of a \code{ggplot} object.}
 
-\item{...}{Additional graphical parameters passed to point layers
-(e.g. \code{alpha}, \code{size}).}
+\item{...}{Additional point parameters, such as \code{alpha} and \code{size}.}
 }
 \value{
-A \code{ggplot} object representing the EVPI curve, or a tidy data frame
-containing EVPI values when \code{return_data = TRUE}.
+A \code{ggplot} object representing the EVPI curve, a
+\code{cea_multplots} object when \code{plot_by} is specified,
+or a tidy data frame containing EVPI values when
+\code{return_data = TRUE}.
 }
 \description{
 Produces Expected Value of Perfect Information (EVPI) curves across a range
@@ -85,15 +82,20 @@ benefit under current uncertainty.
 EVPI curves provide a value-of-information perspective on decision-making
 and are commonly used to assess the potential benefit of additional
 research. The function supports multi-strategy and multi-dataset analyses,
-explicit subgroup stratification, and full user control over aesthetic
-mappings.
+explicit subgroup stratification, and flexible aesthetic mappings.
 
 This function relies on the internal plotting engine
 \code{\link{ce_plot_base}} to ensure consistent aesthetics and behaviour
-across all CEAgroupR visualizations. It is typically used alongside
-\code{\link{plot.icers}} and \code{\link{plot.ceacs}} to provide a
-complementary value-of-information perspective on uncertainty in
-cost-effectiveness analyses.
+across CEAgroupR visualizations.
+
+The EVPI is computed separately for each comparison using incremental
+net monetary benefit relative to the reference strategy.
+
+When \code{plot_by} is specified, the EVPI values are calculated globally
+before being separated into individual plots. All resulting plots share
+the same WTP evaluation grid and global aesthetic configuration.
+
+The \code{shape_by} argument controls line type rather than point shape.
 }
 \examples{
 ## Example 1: EVPI curve for a single dataset
@@ -110,9 +112,27 @@ res <- compute_icers(
 plot.evpis(res)
 
 ## Example 2: EVPI with subgroup stratification
+res_subgroups <- compute_icers(
+  data          = cua_base,
+  group         = "group",
+  cost          = "cost_total",
+  effect        = "effect",
+  ref_group     = "g0",
+  subgroup_vars = "diabetes",
+  R             = 50,
+  seed          = 123
+)
+
 plot.evpis(
-  res,
+  res_subgroups,
   mode     = "Subgroups",
   facet_by = "subgroup"
 )
+
+## Example 3: Separate EVPI plots by dataset
+plot.evpis(
+  res,
+  plot_by = "dataset"
+)
+
 }

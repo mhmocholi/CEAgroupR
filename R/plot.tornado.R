@@ -57,6 +57,7 @@
 #'
 #' @return A ggplot object, a data frame, or a named list of either.
 #' @export
+#' @rawNamespace export(plot.tornado)
 plot.tornado <- function(
     data,
     metric = "nmb",

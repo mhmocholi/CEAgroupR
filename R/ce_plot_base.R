@@ -3,8 +3,8 @@
 #' Internal utility function that constructs the base \code{ggplot2} object
 #' and resolves common aesthetic mappings used across all graphical functions
 #' in the CEAgroupR package. This function ensures consistent handling of
-#' colour, shape and linetype mappings, palette resolution, faceting rules
-#' and legend behaviour.
+#' colour, shape and linetype mappings, palette resolution, faceting rules,
+#' independent plot grouping and legend behaviour.
 #'
 #' This function is not intended to be called directly by users. It is used
 #' internally by \code{plot.icers}, \code{plot.ceacs}, \code{plot.evpis} and
@@ -23,6 +23,11 @@
 #' @param facet_by Character string specifying the faceting directive, or
 #'   \code{"none"} to disable faceting.
 #'
+#' @param plot_by Character string specifying the variable used to split
+#'   the data into independent plots, or \code{NULL} or \code{"none"}
+#'   to disable plot splitting. The variable must exist in \code{data}.
+#'   Plot construction and display are handled by downstream functions.
+#'
 #' @param filter_expr Optional tidyverse-style filtering expression applied
 #'   to the input data prior to plotting.
 #'
@@ -40,8 +45,9 @@
 #'   ignored.
 #'
 #' @return
-#' A list containing the initialized \code{ggplot} object and resolved
-#' aesthetic components required by downstream plotting functions.
+#' A list containing the initialized \code{ggplot} object, resolved
+#' aesthetic components, and plot grouping information (\code{plot_var}
+#' and \code{plot_levels}) required by downstream plotting functions.
 #'
 #' @noRd
 ce_plot_base <- function(
@@ -50,6 +56,7 @@ ce_plot_base <- function(
     shape_by        = NULL,
     facet_by        = NULL,
     filter_expr     = NULL,
+    plot_by         = NULL,
     facet_scales    = "fixed",
     palette         = "Dark2",
     shapes_palette  = NULL,
@@ -95,11 +102,18 @@ ce_plot_base <- function(
   color_by <- normalize(color_by)
   shape_by <- normalize(shape_by)
   facet_by <- normalize(facet_by)
+  plot_by <- normalize(plot_by)
 
   exists_var <- function(v) !is.null(v) && v %in% names(data)
 
   if (!exists_var(color_by)) color_by <- NULL
   if (!exists_var(shape_by)) shape_by <- NULL
+  if (!is.null(plot_by) && !exists_var(plot_by)) {
+    stop(
+      "'plot_by' must be 'none', NULL, or the name of an existing column in 'data'.",
+      call. = FALSE
+    )
+  }
 
   # shape_by requires factor levels
   if (!is.null(shape_by)) {
@@ -238,6 +252,12 @@ ce_plot_base <- function(
     data            = data,
     color_var       = color_by,
     shape_var       = shape_by,
+    plot_var        = plot_by,
+    plot_levels     = if (!is.null(plot_by)) {
+      unique(as.character(data[[plot_by]]))
+    } else {
+      NULL
+    },
     linetype_values = linetype_values,
     shape_values    = shape_values,
     palette_values  = palette_values,

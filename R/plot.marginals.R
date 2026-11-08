@@ -1,3 +1,4 @@
+
 #' Plot Marginal Distributions of Incremental Outcomes
 #'
 #' Visualizes marginal distributions of incremental cost
@@ -8,13 +9,12 @@
 #' incremental cost-effectiveness plane.
 #'
 #' The function supports multiple geometries, including histograms, kernel
-#' density estimates and boxplots. It is designed to facilitate inspection of
-#' the distributional shape, spread and asymmetry of incremental outcomes
-#' across strategies, datasets and subgroups.
+#' density estimates and boxplots. It facilitates inspection of distributional
+#' shape, spread and asymmetry across strategies, datasets and subgroups.
 #'
 #' The function adheres to the unified graphical conventions of CEAgroupR,
-#' ensuring consistent colour mapping, palette handling, faceting behaviour
-#' and legend logic across all visualization functions.
+#' ensuring consistent colour mapping, palette handling, faceting behaviour,
+#' plot grouping and legend logic across visualization functions.
 #'
 #' @inheritParams plot.icers
 #'
@@ -35,14 +35,21 @@
 #' @details
 #' Marginal distributions are useful for exploring the uncertainty of costs
 #' or effects independently, identifying skewness, multimodality or extreme
-#' values that may not be immediately apparent in joint plots. This function
-#' is typically used alongside \code{\link{plot.icers}} to provide complementary
-#' perspectives on uncertainty.
+#' values that may not be immediately apparent in joint plots.
+#'
+#' When \code{plot_by} is specified, separate plots are generated for each
+#' level of the selected grouping variable. The global aesthetic mappings
+#' are preserved across plots and the results are managed through
+#' \code{cea_multplots_handler}.
+#'
+#' The \code{shape_by} argument controls line type rather than point shape.
 #'
 #' @return
 #' A \code{ggplot} object representing the marginal distribution of the
-#' selected incremental outcome.
+#' selected incremental outcome, or a \code{cea_multplots} object when
+#' \code{plot_by} is specified.
 #'
+
 #' @examples
 #' ## Example 1: Marginal distribution of incremental costs
 #' res <- compute_icers(
@@ -61,40 +68,50 @@
 #'   geom_type = "density"
 #' )
 #'
-#' ## Example 2: Marginal effects by dataset with custom linetypes
+#' ## Example 2: Marginal effects with custom linetypes
 #' plot.marginals(
 #'   res,
-#'   variable        = "effect",
-#'   geom_type       = "density",
-#'   shape_by        = "dataset",
-#'   shapes_palette  = custom_shapes(
+#'   variable       = "effect",
+#'   geom_type      = "density",
+#'   shape_by       = "dataset",
+#'   shapes_palette = custom_shapes(
 #'     linetypes = c("dashed", "dotted")
 #'   )
 #' )
-#' @export plot.marginals
+#'
+#' ## Example 3: Separate marginal distributions by dataset
+#' plot.marginals(
+#'   res,
+#'   variable  = "cost",
+#'   geom_type = "histogram",
+#'   plot_by   = "dataset"
+#' )
+#'
 #' @export
+#' @rawNamespace export(plot.marginals)
 plot.marginals <- function(
     data,
-    variable     = "cost",
-    geom_type    = "histogram",
-    color_by     = NULL,
-    shape_by     = NULL,
-    facet_by     = NULL,
-    mode         = "Overall",
-    filter_expr  = NULL,
-    facet_scales = "fixed",
-    palette      = "Dark2",
+    variable       = "cost",
+    geom_type      = "histogram",
+    color_by       = NULL,
+    shape_by       = NULL,
+    facet_by       = NULL,
+    plot_by        = NULL,
+    mode           = "Overall",
+    filter_expr    = NULL,
+    facet_scales   = "fixed",
+    palette        = "Dark2",
     shapes_palette = NULL,
-    bins         = 30,
+    bins           = 30,
     ...
 ) {
 
   `%||%` <- function(a, b) if (!is.null(a)) a else b
   alpha_fill <- function(cols) scales::alpha(cols, 0.5)
 
-  # ============================================================
+  # ===========================================================================
   # 1. Input extraction
-  # ============================================================
+  # ===========================================================================
   if (inherits(data, "cea_results_list")) {
 
     if (is.null(data$combined_replicates))
@@ -113,31 +130,47 @@ plot.marginals <- function(
   if (!"group_uid" %in% names(df)) {
     df$group_uid <- with(
       df,
-      paste(dataset, subgroup_var, subgroup_level, comparison, sep = "_")
+      paste(
+        dataset,
+        subgroup_var,
+        subgroup_level,
+        comparison,
+        sep = "_"
+      )
     )
   }
 
-  # ============================================================
+  # ===========================================================================
   # 2. Optional filtering
-  # ============================================================
+  # ===========================================================================
   if (!is.null(filter_expr)) {
-    df <- dplyr::filter(df, !!rlang::parse_expr(filter_expr))
+    df <- dplyr::filter(
+      df,
+      !!rlang::parse_expr(filter_expr)
+    )
   }
 
-  # ============================================================
+  # ===========================================================================
   # 3. Mode filtering
-  # ============================================================
+  # ===========================================================================
   mode <- match.arg(mode, c("Overall", "Subgroups"))
 
   if (mode == "Overall") {
-    df <- df[df$subgroup_var == "Overall" | is.na(df$subgroup_var), ]
+    df <- df[
+      df$subgroup_var == "Overall" | is.na(df$subgroup_var),
+    ]
   } else {
-    df <- df[df$subgroup_var != "Overall" & !is.na(df$subgroup_var), ]
+    df <- df[
+      df$subgroup_var != "Overall" & !is.na(df$subgroup_var),
+    ]
   }
 
-  # ============================================================
+  if (nrow(df) == 0L)
+    stop("No observations available after filtering and mode selection.")
+
+  # ===========================================================================
   # 4. Delta variable selection
-  # ============================================================
+  # ===========================================================================
   var_col <- switch(
     variable,
     "cost"   = "Delta_Cost",
@@ -145,9 +178,14 @@ plot.marginals <- function(
     stop("`variable` must be 'cost' or 'effect'.")
   )
 
-  # ============================================================
+  geom_type <- match.arg(
+    geom_type,
+    c("histogram", "density", "boxplot")
+  )
+
+  # ===========================================================================
   # 5. Defaults and user overrides
-  # ============================================================
+  # ===========================================================================
   default_color <- "comparison"
   default_shape <- "dataset"
   default_facet <- if (mode == "Subgroups") "subgroup" else "none"
@@ -155,195 +193,341 @@ plot.marginals <- function(
   resolved_color <- color_by %||% default_color
   resolved_shape <- shape_by %||% default_shape
   resolved_facet <- facet_by %||% default_facet
+  resolved_plot  <- plot_by
 
-  if (identical(color_by, "none")) resolved_color <- NULL
-  if (identical(shape_by, "none")) resolved_shape <- NULL
-  if (identical(facet_by, "none")) resolved_facet <- NULL
+  if (identical(color_by, "none"))
+    resolved_color <- NULL
 
-  # ============================================================
-  # 6. Base plot engine
-  # ============================================================
+  if (identical(shape_by, "none"))
+    resolved_shape <- NULL
+
+  if (identical(facet_by, "none"))
+    resolved_facet <- NULL
+
+  if (identical(plot_by, "none"))
+    resolved_plot <- NULL
+
+  # ===========================================================================
+  # 6. Global base plot engine
+  # ===========================================================================
   base <- ce_plot_base(
     data           = df,
     color_by       = resolved_color,
     shape_by       = resolved_shape,
-    facet_by       = resolved_facet,
+    facet_by       = "none",
+    plot_by        = resolved_plot,
     facet_scales   = facet_scales,
     palette        = palette,
     shapes_palette = shapes_palette
   )
 
-  p               <- base$plot
   color_var       <- base$color_var
   shape_var       <- base$shape_var
+  plot_var        <- base$plot_var
+  plot_levels     <- base$plot_levels
   palette_values  <- base$palette_values
   linetype_values <- base$linetype_values
+  theme_marginal  <- base$plot$theme
 
+  # ===========================================================================
+  # 7. Resolve faceting independently of plot_by
+  # ===========================================================================
+  facet_layer <- NULL
+
+  if (!is.null(resolved_facet)) {
+
+    facet_base <- ce_plot_base(
+      data           = df,
+      color_by       = resolved_color,
+      shape_by       = resolved_shape,
+      facet_by       = resolved_facet,
+      plot_by        = NULL,
+      facet_scales   = facet_scales,
+      palette        = palette,
+      shapes_palette = shapes_palette
+    )
+
+    facet_layer <- facet_base$plot$facet
+  }
+
+  # ===========================================================================
+  # 8. Additional graphical arguments
+  # ===========================================================================
   args      <- list(...)
-  alpha_val <- args$alpha     %||% 0.5
+  alpha_val <- args$alpha %||% 0.5
   lw_val    <- args$linewidth %||% 0.6
 
-  # ============================================================
-  # 7. Scales for colour and fill
-  # ============================================================
-  if (!is.null(color_var)) {
-    p <- p + ggplot2::scale_colour_manual(values = palette_values)
-    p <- p + ggplot2::scale_fill_manual(values = alpha_fill(palette_values))
-  }
+  # ===========================================================================
+  # 9. Internal marginal plot builder
+  # ===========================================================================
+  build_plot <- function(plot_df, plot_label = NULL) {
 
-  # ============================================================
-  # 8. Linetype scale
-  # ============================================================
-  shape_active <- !is.null(shape_var)
+    # ------------------------------------------------------------------------
+    # 9.1. Base plot
+    # ------------------------------------------------------------------------
+    p <- ggplot2::ggplot(plot_df) +
+      theme_marginal
 
-  if (shape_active && !is.null(linetype_values)) {
-    p <- p + ggplot2::scale_linetype_manual(values = linetype_values)
-  } else {
-    p <- p + ggplot2::guides(linetype = "none")
-  }
-
-  # ============================================================
-  # 8b. Legend cleanup
-  # ============================================================
-  if (!is.null(color_var) &&
-      dplyr::n_distinct(df[[color_var]]) == 1) {
-    p <- p + ggplot2::guides(colour = "none", fill = "none")
-  }
-
-  if (shape_active &&
-      dplyr::n_distinct(df[[shape_var]]) == 1) {
-    p <- p + ggplot2::guides(linetype = "none")
-  }
-
-  # ============================================================
-  # 9. Geometry layers
-  # ============================================================
-  if (geom_type == "density") {
-
-    aes_density <- ggplot2::aes(
-      x = .data[[var_col]],
-      group = group_uid
-    )
-
-    if (!is.null(color_var)) {
-      aes_density$colour <- rlang::sym(color_var)
-      aes_density$fill   <- rlang::sym(color_var)
+    if (!is.null(facet_layer) &&
+        inherits(facet_layer, "ggproto")) {
+      p <- p + facet_layer
     }
 
-    if (shape_active)
-      aes_density$linetype <- rlang::sym(shape_var)
-
-    p <- p + ggplot2::geom_density(
-      data        = df,
-      mapping     = aes_density,
-      alpha       = alpha_val,
-      linewidth   = lw_val,
-      inherit.aes = FALSE
-    )
-
-  } else if (geom_type == "histogram") {
-
-    aes_hist <- ggplot2::aes(
-      x = .data[[var_col]],
-      group = group_uid
-    )
-
+    # ------------------------------------------------------------------------
+    # 9.2. Scales for colour and fill
+    # ------------------------------------------------------------------------
     if (!is.null(color_var)) {
-      aes_hist$fill   <- rlang::sym(color_var)
-      aes_hist$colour <- rlang::sym(color_var)
+      p <- p +
+        ggplot2::scale_colour_manual(
+          values = palette_values
+        ) +
+        ggplot2::scale_fill_manual(
+          values = alpha_fill(palette_values)
+        )
     }
 
-    if (shape_active)
-      aes_hist$linetype <- rlang::sym(shape_var)
+    # ------------------------------------------------------------------------
+    # 9.3. Linetype scale
+    # ------------------------------------------------------------------------
+    shape_active <- !is.null(shape_var)
 
-    p <- p + ggplot2::geom_histogram(
-      data        = df,
-      mapping     = aes_hist,
-      bins        = bins,
-      alpha       = alpha_val,
-      linewidth   = lw_val,
-      position    = "identity",
-      inherit.aes = FALSE
-    )
+    if (shape_active && !is.null(linetype_values)) {
+      p <- p +
+        ggplot2::scale_linetype_manual(
+          values = linetype_values
+        )
+    } else {
+      p <- p +
+        ggplot2::guides(linetype = "none")
+    }
 
-    ## --- CRITICAL FIX: force line-based legend for dataset ---
+    # ------------------------------------------------------------------------
+    # 9.4. Legend cleanup
+    # ------------------------------------------------------------------------
+    if (!is.null(color_var) &&
+        dplyr::n_distinct(plot_df[[color_var]]) == 1) {
+      p <- p +
+        ggplot2::guides(
+          colour = "none",
+          fill   = "none"
+        )
+    }
+
     if (shape_active &&
-        dplyr::n_distinct(df[[shape_var]]) > 1) {
+        dplyr::n_distinct(plot_df[[shape_var]]) == 1) {
+      p <- p +
+        ggplot2::guides(linetype = "none")
+    }
 
-      p <- p + ggplot2::guides(
-        linetype = ggplot2::guide_legend(
-          title        = shape_var,
-          override.aes = list(
-            colour    = "black",
-            fill      = NA,
-            linetype  = linetype_values,
-            linewidth = 0.8
+    # ------------------------------------------------------------------------
+    # 9.5. Geometry layers
+    # ------------------------------------------------------------------------
+    if (geom_type == "density") {
+
+      aes_density <- ggplot2::aes(
+        x     = .data[[var_col]],
+        group = group_uid
+      )
+
+      if (!is.null(color_var)) {
+        aes_density$colour <- rlang::sym(color_var)
+        aes_density$fill   <- rlang::sym(color_var)
+      }
+
+      if (shape_active)
+        aes_density$linetype <- rlang::sym(shape_var)
+
+      p <- p +
+        ggplot2::geom_density(
+          data        = plot_df,
+          mapping     = aes_density,
+          alpha       = alpha_val,
+          linewidth   = lw_val,
+          inherit.aes = FALSE
+        )
+
+    } else if (geom_type == "histogram") {
+
+      aes_hist <- ggplot2::aes(
+        x     = .data[[var_col]],
+        group = group_uid
+      )
+
+      if (!is.null(color_var)) {
+        aes_hist$fill   <- rlang::sym(color_var)
+        aes_hist$colour <- rlang::sym(color_var)
+      }
+
+      if (shape_active)
+        aes_hist$linetype <- rlang::sym(shape_var)
+
+      p <- p +
+        ggplot2::geom_histogram(
+          data        = plot_df,
+          mapping     = aes_hist,
+          bins        = bins,
+          alpha       = alpha_val,
+          linewidth   = lw_val,
+          position    = "identity",
+          inherit.aes = FALSE
+        )
+
+      # Force line-based legend for grouped histogram outlines
+      if (shape_active &&
+          dplyr::n_distinct(plot_df[[shape_var]]) > 1 &&
+          !is.null(linetype_values)) {
+
+        p <- p +
+          ggplot2::guides(
+            linetype = ggplot2::guide_legend(
+              title = shape_var,
+              override.aes = list(
+                colour    = "black",
+                fill      = NA,
+                linetype  = linetype_values,
+                linewidth = 0.8
+              )
+            )
+          )
+      }
+
+    } else if (geom_type == "boxplot") {
+
+      x_var <- color_var
+
+      if (is.null(x_var))
+        stop("Boxplot requires a valid `color_by` aesthetic.")
+
+      aes_box <- ggplot2::aes(
+        x = .data[[x_var]],
+        y = .data[[var_col]]
+      )
+
+      if (!is.null(color_var)) {
+        aes_box$fill   <- rlang::sym(color_var)
+        aes_box$colour <- rlang::sym(color_var)
+      }
+
+      if (shape_active)
+        aes_box$linetype <- rlang::sym(shape_var)
+
+      p <- p +
+        ggplot2::geom_boxplot(
+          data          = plot_df,
+          mapping       = aes_box,
+          alpha         = alpha_val,
+          linewidth     = lw_val,
+          outlier.shape = 21,
+          outlier.size  = 1.4,
+          inherit.aes   = FALSE
+        )
+    }
+
+    # ------------------------------------------------------------------------
+    # 9.6. Labels and scales
+    # ------------------------------------------------------------------------
+    if (geom_type != "boxplot") {
+
+      p <- p +
+        ggplot2::scale_x_continuous(
+          labels = scales::label_number()
+        ) +
+        ggplot2::scale_y_continuous(
+          labels = scales::label_number()
+        ) +
+        ggplot2::labs(
+          title = paste(
+            "Distribution of Delta",
+            tools::toTitleCase(variable)
+          ),
+          x        = paste(
+            "Delta",
+            tools::toTitleCase(variable)
+          ),
+          y        = "Density",
+          colour   = color_var,
+          fill     = color_var,
+          linetype = shape_var
+        )
+
+    } else {
+
+      p <- p +
+        ggplot2::scale_y_continuous(
+          labels = scales::label_number()
+        ) +
+        ggplot2::labs(
+          title = paste(
+            "Distribution of Delta",
+            tools::toTitleCase(variable)
+          ),
+          x        = color_var,
+          y        = "Value",
+          colour   = color_var,
+          fill     = color_var,
+          linetype = shape_var
+        )
+    }
+
+    if (!is.null(plot_label)) {
+      p <- p +
+        ggplot2::labs(
+          subtitle = paste0(
+            plot_var,
+            ": ",
+            plot_label
           )
         )
-      )
     }
 
-  } else if (geom_type == "boxplot") {
+    return(p)
+  }
 
-    x_var <- color_var
-    if (is.null(x_var))
-      stop("Boxplot requires a valid `color_by` aesthetic.")
-
-    aes_box <- ggplot2::aes(
-      x = .data[[x_var]],
-      y = .data[[var_col]]
-    )
-
-    if (!is.null(color_var)) {
-      aes_box$fill   <- rlang::sym(color_var)
-      aes_box$colour <- rlang::sym(color_var)
-    }
-
-    if (shape_active)
-      aes_box$linetype <- rlang::sym(shape_var)
-
-    p <- p + ggplot2::geom_boxplot(
-      data          = df,
-      mapping       = aes_box,
-      alpha         = alpha_val,
-      linewidth     = lw_val,
-      outlier.shape = 21,
-      outlier.size  = 1.4,
-      inherit.aes   = FALSE
+  # ===========================================================================
+  # 10. Single plot
+  # ===========================================================================
+  if (is.null(plot_var)) {
+    return(
+      build_plot(df)
     )
   }
 
-  # ============================================================
-  # 10. Labels and scales
-  # ============================================================
-  if (geom_type != "boxplot") {
+  # ===========================================================================
+  # 11. Multiple plots using plot_by
+  # ===========================================================================
+  plot_groups <- split(
+    df,
+    factor(
+      df[[plot_var]],
+      levels = plot_levels
+    ),
+    drop = TRUE
+  )
 
-    p <- p +
-      ggplot2::scale_x_continuous(labels = scales::label_number()) +
-      ggplot2::scale_y_continuous(labels = scales::label_number()) +
-      ggplot2::labs(
-        title    = paste("Distribution of Delta", tools::toTitleCase(variable)),
-        x        = paste("Delta", tools::toTitleCase(variable)),
-        y        = "Density",
-        colour   = color_var,
-        fill     = color_var,
-        linetype = shape_var
+  plots <- lapply(
+    names(plot_groups),
+    function(plot_label) {
+      build_plot(
+        plot_df    = plot_groups[[plot_label]],
+        plot_label = plot_label
       )
+    }
+  )
 
-  } else {
+  names(plots) <- names(plot_groups)
 
-    p <- p +
-      ggplot2::scale_y_continuous(labels = scales::label_number()) +
-      ggplot2::labs(
-        title    = paste("Distribution of Delta", tools::toTitleCase(variable)),
-        x        = color_var,
-        y        = "Value",
-        colour   = color_var,
-        fill     = color_var,
-        linetype = shape_var
-      )
-  }
+  # ===========================================================================
+  # 12. Multi-plot handler
+  # ===========================================================================
+  output <- structure(
+    plots,
+    class = c("cea_multplots", "list")
+  )
 
-  return(p)
+  return(
+    cea_multplots_handler(
+      output,
+      plot_type = "Marginal distributions"
+    )
+  )
 }
-
