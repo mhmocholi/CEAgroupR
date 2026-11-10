@@ -27,30 +27,51 @@ individual-level costs, effects, resource utilization and strategies.}
 
 \item{ref}{Character string identifying the reference strategy.}
 
-\item{parameters}{A data frame containing the parameters to be varied.
-The following columns are required:
+\item{parameters}{Either:
 \itemize{
-\item \code{parameter}: parameter identifier.
-\item \code{resource}: corresponding resource utilization variable.
-\item \code{base}: baseline unit cost.
-\item \code{lower}: lower parameter value.
-\item \code{upper}: upper parameter value.
-}}
+\item An object of class \code{cea_parameters}, created using
+\code{define_cea_parameters()}.
+\item A data frame specifying the sensitivity parameters.
+}
 
-\item{lambda}{Numeric vector of willingness-to-pay thresholds used
-to calculate incremental NMBs. Defaults to 25000.}
+For data frames, required columns are:
+\itemize{
+\item \code{parameter}: unique parameter identifier.
+\item \code{resource}: resource utilization variable for cost
+parameters; \code{NA} for effect parameters.
+\item \code{base}: baseline unit cost for cost parameters;
+zero for effect parameters.
+\item \code{lower}: lower unit cost or proportional effect variation.
+\item \code{upper}: upper unit cost or proportional effect variation.
+}
 
-\item{subgroup_vars}{Optional character vector specifying subgroup
-variables. Overall and subgroup-specific results are calculated.}
+Optional columns:
+\itemize{
+\item \code{type}: \code{"cost"} or \code{"effect"}.
+Defaults to \code{"cost"} for backward compatibility.
+\item \code{comparison}: target alternative strategy for effect
+parameters. \code{NA} applies the same proportional variation
+to each alternative's own incremental effect.
+Not applicable to cost parameters.
+}
+
+When \code{parameters} is a \code{cea_parameters} object, its
+deterministic specifications are automatically converted into
+the internal parameter table. Parameters without deterministic
+specifications are excluded from OWSA.}
+
+\item{lambda}{Numeric vector of willingness-to-pay thresholds.
+Defaults to 25000.}
+
+\item{subgroup_vars}{Optional character vector of subgroup variables.}
 }
 \value{
 An object of class \code{owsa_result} containing:
 \itemize{
-\item One element per dataset, with \code{Overall} and
-\code{Subgroups} components containing scenario-specific
-economic results.
+\item One element per dataset with \code{Overall} and
+\code{Subgroups} results.
 \item \code{sensitivity_results}: consolidated results table.
-\item \code{parameters}: parameter specification table.
+\item \code{parameters}: normalized parameter specification table.
 \item \code{settings}: analysis settings and metadata.
 }
 }
@@ -60,32 +81,45 @@ costs, incremental effects, Incremental Cost-Effectiveness Ratios (ICERs),
 and incremental Net Monetary Benefits (NMBs).
 }
 \details{
-The function evaluates the impact of varying individual cost parameters
-between user-defined lower and upper bounds, while holding all other
-parameters constant.
+The function supports variations in resource unit costs and proportional
+variations in incremental effectiveness.
 
-Each parameter is linked to an individual-level resource utilization
-variable. Alternative costs are calculated by adjusting the original
-individual costs according to the difference between the scenario-specific
-and baseline unit costs.
+Cost parameters modify individual-level costs according to resource
+utilization. Effect parameters modify the incremental effect relative
+to the reference strategy, without modifying the reference effect.
 
-The function supports multiple datasets, intervention strategies,
-subgroup analyses and willingness-to-pay thresholds.
+Each parameter is varied independently while all other parameters
+remain at their baseline values.
 
-Results are organized hierarchically by dataset, overall population
-and subgroup, while also providing a consolidated results table.
+Multiple datasets, intervention strategies, subgroup analyses and
+willingness-to-pay thresholds are supported.
 
-Three scenarios are evaluated for each parameter: baseline, lower
-and upper. Only one parameter is varied at a time.
+Three scenarios are evaluated independently for each parameter:
+\code{baseline}, \code{lower} and \code{upper}.
 
-Individual-level costs are recalculated as:
+For cost parameters, individual-level costs are recalculated as:
 \deqn{C_{i,new} = C_{i,base} + R_i(P_{new} - P_{base})}
 
-Incremental NMB is calculated separately for each threshold:
+For effect parameters, incremental effectiveness is recalculated as:
+\deqn{\Delta E_{new} = \Delta E_{base}(1+p)}
+
+Here, \eqn{p} is the proportional variation. For example,
+\code{-0.20} represents a 20 percent reduction and \code{0.20}
+represents a 20 percent increase.
+
+Effect parameters must have \code{base = 0}, and their lower
+variation must be greater than or equal to \code{-1}.
+The reference strategy remains unchanged.
+
+When \code{comparison} identifies a particular strategy, only its
+incremental effect is modified. Other comparisons retain their
+baseline incremental effects.
+
+Incremental NMB is calculated as:
 \deqn{NMB(\lambda) = \lambda \Delta E - \Delta C}
 
-NMB columns follow the same naming convention as compute_icers():
-NMB_15000, NMB_25000, etc.
+NMB columns follow the naming convention used by
+\code{compute_icers()}, such as \code{NMB_25000}.
 
 The analysis is deterministic and does not perform bootstrap resampling.
 }

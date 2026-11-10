@@ -1,4 +1,3 @@
-
 #' Plot One-Way Sensitivity Analysis Tornado Diagrams
 #'
 #' Produces tornado diagrams from deterministic one-way sensitivity
@@ -8,12 +7,23 @@
 #' thresholds, and independent plots using plot_by.
 #'
 #' @param data An object of class "owsa_result".
-#' @param metric One of "icer", "nmb", "delta_cost", "delta_effect".
+#' @param metric Economic outcome to represent. One of:
+#'   \itemize{
+#'     \item \code{"icer"}: incremental cost-effectiveness ratio.
+#'     \item \code{"nmb"}: incremental net monetary benefit.
+#'     \item \code{"delta_cost"}: incremental cost.
+#'     \item \code{"delta_effect"}: incremental effectiveness.
+#'   }
+#'   The willingness-to-pay threshold \code{lambda} is used only
+#'   when \code{metric = "nmb"}. For all other metrics, any supplied
+#'   \code{lambda} is ignored with an informational warning.
+#'
 #' @param lambda Optional willingness-to-pay threshold for NMB plots.
+#'   When multiple thresholds are available, one must be selected
+#'   if \code{metric = "nmb"}. Ignored for all other metrics.
 #' @param impact_mode Either "absolute" or "relative".
 #' @param shape_by Dimension mapped to bar outline linetypes. NULL uses
-#'   "dataset"; "none" disables linetype grouping. No point markers
-#'   are drawn.
+#'   "dataset"; "none" disables linetype grouping.
 #' @param facet_by Faceting directive: "none", "dataset",
 #'   "comparison", "subgroup_var", "subgroup_level", or "subgroup".
 #'   NULL uses "none" in Overall mode and "subgroup" in Subgroups mode.
@@ -25,9 +35,7 @@
 #' @param facet_scales Facet scaling behaviour.
 #' @param palette Named colours for lower and upper scenarios.
 #' @param shapes_palette Optional object of class "cea_shapes".
-#'   Its linetype definitions are used when supplied.
-#' @param alpha Bar fill opacity, between 0 and 1. Defaults to 0.40.
-#'   Bar outlines retain their original, fully opaque colours.
+#' @param alpha Bar fill opacity, between 0 and 1.
 #' @param return_data Return plotting data instead of graphs.
 #'
 #' @details
@@ -38,22 +46,23 @@
 #'
 #' The original economic values are preserved in the returned data.
 #'
+#' Parameter ranking is calculated independently for each plot when
+#' plot_by is active. Parameters with zero impact throughout an
+#' independent plot are excluded from its graphical representation.
+#'
+#' When plot_by = "none", a global ranking based on mean impact
+#' across analytical combinations is retained.
+#'
+#' Impact is defined as the maximum absolute deviation from baseline
+#' across the lower and upper scenarios.
+#'
 #' In relative mode, a vertical reference line is drawn at zero.
 #' In absolute mode, a vertical reference line is drawn at the
-#' baseline only when all series in the plot share the same
-#' baseline value. No common reference line is drawn when
-#' different baselines are present.
+#' baseline only when all series share the same baseline value.
 #'
 #' By default, independent plots are generated for each comparison.
 #' Overall mode does not facet automatically. Subgroups mode facets
 #' by subgroup variable and level.
-#'
-#' Passing "none" to plot_by generates a single combined plot.
-#' Passing "none" to facet_by disables faceting explicitly.
-#'
-#' When plot_by is active, the function returns a named list
-#' of ggplot objects, one for each level of the selected dimension.
-#' With return_data = TRUE, the same structure contains data frames.
 #'
 #' @return A ggplot object, a data frame, or a named list of either.
 #' @export
@@ -99,7 +108,6 @@ plot.tornado <- function(
     c("Overall", "Subgroups")
   )
 
-  # Default impact representation according to analysis mode
   default_impact <- if (mode == "Subgroups") {
     "relative"
   } else {
@@ -138,7 +146,6 @@ plot.tornado <- function(
     "subgroup_level"
   )
 
-  # Validate explicitly supplied graphical directives.
   validate_directive <- function(value, allowed, argument) {
 
     if (is.null(value)) {
@@ -193,9 +200,6 @@ plot.tornado <- function(
   # -------------------------------------------------------------------------
   # 2. Resolve graphical defaults according to mode
   # -------------------------------------------------------------------------
-  # Same default-resolution convention as plot.marginals():
-  # NULL means automatic; "none" means explicitly disabled.
-
   default_shape <- "dataset"
 
   default_facet <- if (mode == "Subgroups") {
@@ -214,8 +218,6 @@ plot.tornado <- function(
     resolved_shape <- NULL
   }
 
-  # Keep "none" as an internal sentinel for plot/facet
-  # because their execution paths use that value.
   expanded_facets <- switch(
     resolved_facet,
     none = character(0),
@@ -281,11 +283,19 @@ plot.tornado <- function(
 
     metric_column <- paste0("NMB_", selected_lambda)
 
-  } else if (!is.null(lambda)) {
+  } else {
 
-    stop(
-      "'lambda' is only applicable when metric = 'nmb'."
-    )
+    # Lambda has no analytical role outside NMB.
+    # Ignore it without interrupting plotting.
+
+    if (!is.null(lambda)) {
+      warning(
+        "'lambda' is ignored when metric = '",
+        metric,
+        "'. It is only applicable when metric = 'nmb'.",
+        call. = FALSE
+      )
+    }
   }
 
   # -------------------------------------------------------------------------
@@ -439,28 +449,6 @@ plot.tornado <- function(
   tornado_long$segment_start <- tornado_long$plot_baseline
   tornado_long$segment_end <- tornado_long$plot_value
 
-  # Global parameter ranking based on mean impact
-  # across all analytical combinations.
-
-  ranking <- stats::aggregate(
-    impact ~ parameter,
-    data = tornado,
-    FUN = mean
-  )
-
-  ranking <- ranking[
-    order(ranking$impact, ranking$parameter),
-    ,
-    drop = FALSE
-  ]
-
-  parameter_levels <- as.character(ranking$parameter)
-
-  tornado_long$parameter <- factor(
-    tornado_long$parameter,
-    levels = parameter_levels
-  )
-
   # -------------------------------------------------------------------------
   # 8. Resolve scenario colours
   # -------------------------------------------------------------------------
@@ -562,7 +550,77 @@ plot.tornado <- function(
   )
 
   # -------------------------------------------------------------------------
-  # 10. Internal function: prepare geometry for one plot
+  # 10. Internal function: rank parameters for one plot
+  # -------------------------------------------------------------------------
+  rank_plot_data <- function(
+    plot_df,
+    independent = FALSE
+  ) {
+
+    # In independent plots, remove parameters with no impact
+    # across all analytical combinations in that plot.
+    # Combined plots retain every parameter.
+
+    if (independent) {
+
+      parameter_impacts <- stats::aggregate(
+        impact ~ parameter,
+        data = plot_df,
+        FUN = max
+      )
+
+      active_parameters <- as.character(
+        parameter_impacts$parameter[
+          !is.na(parameter_impacts$impact) &
+            parameter_impacts$impact > 0
+        ]
+      )
+
+      # If every parameter has zero impact, retain the data
+      # so that an empty plot is not generated.
+      if (length(active_parameters) > 0L) {
+
+        plot_df <- plot_df[
+          as.character(plot_df$parameter) %in%
+            active_parameters,
+          ,
+          drop = FALSE
+        ]
+      }
+    }
+
+    # Calculate ranking using only the current plot's data.
+    # Global ranking is retained when plot_by = "none".
+
+    ranking <- stats::aggregate(
+      impact ~ parameter,
+      data = plot_df,
+      FUN = mean
+    )
+
+    ranking <- ranking[
+      order(
+        ranking$impact,
+        as.character(ranking$parameter)
+      ),
+      ,
+      drop = FALSE
+    ]
+
+    parameter_levels <- as.character(
+      ranking$parameter
+    )
+
+    plot_df$parameter <- factor(
+      as.character(plot_df$parameter),
+      levels = parameter_levels
+    )
+
+    plot_df
+  }
+
+  # -------------------------------------------------------------------------
+  # 11. Internal function: prepare geometry for one plot
   # -------------------------------------------------------------------------
   prepare_plot_data <- function(plot_df) {
 
@@ -613,7 +671,7 @@ plot.tornado <- function(
       drop = FALSE
     ]
 
-    # Dynamic vertical spacing.
+    # Dynamic vertical spacing
     total_band <- 0.60
     fill_ratio <- 0.78
 
@@ -683,12 +741,15 @@ plot.tornado <- function(
   }
 
   # -------------------------------------------------------------------------
-  # 11. Internal function: construct one tornado plot
+  # 12. Internal function: construct one tornado plot
   # -------------------------------------------------------------------------
   build_plot <- function(plot_df, plot_label = NULL) {
 
-    # Only linetypes are used for analytical series.
-    # Point shapes and baseline markers are intentionally omitted.
+    # Parameter labels are local to the current plot.
+    parameter_levels <- levels(
+      plot_df$parameter
+    )
+
     linetype_values <- NULL
 
     if (!is.null(resolved_shape)) {
@@ -740,13 +801,6 @@ plot.tornado <- function(
     # -----------------------------------------------------------------------
     # Vertical baseline reference
     # -----------------------------------------------------------------------
-    # Relative mode: all analytical baselines are zero.
-    # Absolute mode: show a reference only when all series
-    # in the current plot share a single baseline value.
-    #
-    # Multiple distinct absolute baselines are deliberately
-    # left without a common reference line.
-
     reference_value <- NULL
 
     if (impact_mode == "relative") {
@@ -817,7 +871,7 @@ plot.tornado <- function(
     }
 
     # -----------------------------------------------------------------------
-    # Linetype legend: show only when multiple analytical series exist
+    # Linetype legend
     # -----------------------------------------------------------------------
     if (!is.null(resolved_shape)) {
 
@@ -842,7 +896,6 @@ plot.tornado <- function(
 
       } else {
 
-        # Suppress redundant legends for a single series.
         p <- p +
           ggplot2::guides(
             linetype = "none"
@@ -850,7 +903,9 @@ plot.tornado <- function(
       }
     }
 
-    # Faceting remains independent from plot_by.
+    # -----------------------------------------------------------------------
+    # Faceting
+    # -----------------------------------------------------------------------
     if (resolved_facet == "subgroup") {
 
       p <- p +
@@ -903,11 +958,17 @@ plot.tornado <- function(
   }
 
   # -------------------------------------------------------------------------
-  # 12. Resolve independent plots
+  # 13. Resolve independent plots
   # -------------------------------------------------------------------------
   if (resolved_plot == "none") {
 
-    plot_df <- prepare_plot_data(tornado_long)
+    # Combined plot: preserve global ranking.
+    plot_df <- rank_plot_data(
+      tornado_long,
+      independent = FALSE
+    )
+
+    plot_df <- prepare_plot_data(plot_df)
 
     if (return_data) {
       return(plot_df)
@@ -916,7 +977,7 @@ plot.tornado <- function(
     return(build_plot(plot_df))
   }
 
-  # Separate data by the requested analytical dimension.
+  # Independent plots: each plot receives its own ranking.
   plot_levels <- unique(
     as.character(tornado_long[[resolved_plot]])
   )
@@ -938,7 +999,11 @@ plot.tornado <- function(
       drop = FALSE
     ]
 
-    # Recalculate vertical geometry independently for each plot.
+    plot_df <- rank_plot_data(
+      plot_df,
+      independent = TRUE
+    )
+
     plot_df <- prepare_plot_data(plot_df)
 
     if (return_data) {
@@ -954,8 +1019,11 @@ plot.tornado <- function(
     }
   }
 
-  # Enable interactive multi-plot viewing and identify the plot type
+  # -------------------------------------------------------------------------
+  # 14. Interactive multiple plots handler
+  # -------------------------------------------------------------------------
   if (!return_data && resolved_plot != "none") {
+
     output <- cea_multplots_handler(
       output,
       plot_type = "Tornado plot"

@@ -24,15 +24,25 @@
 \arguments{
 \item{data}{An object of class "owsa_result".}
 
-\item{metric}{One of "icer", "nmb", "delta_cost", "delta_effect".}
+\item{metric}{Economic outcome to represent. One of:
+\itemize{
+\item \code{"icer"}: incremental cost-effectiveness ratio.
+\item \code{"nmb"}: incremental net monetary benefit.
+\item \code{"delta_cost"}: incremental cost.
+\item \code{"delta_effect"}: incremental effectiveness.
+}
+The willingness-to-pay threshold \code{lambda} is used only
+when \code{metric = "nmb"}. For all other metrics, any supplied
+\code{lambda} is ignored with an informational warning.}
 
-\item{lambda}{Optional willingness-to-pay threshold for NMB plots.}
+\item{lambda}{Optional willingness-to-pay threshold for NMB plots.
+When multiple thresholds are available, one must be selected
+if \code{metric = "nmb"}. Ignored for all other metrics.}
 
 \item{impact_mode}{Either "absolute" or "relative".}
 
 \item{shape_by}{Dimension mapped to bar outline linetypes. NULL uses
-"dataset"; "none" disables linetype grouping. No point markers
-are drawn.}
+"dataset"; "none" disables linetype grouping.}
 
 \item{facet_by}{Faceting directive: "none", "dataset",
 "comparison", "subgroup_var", "subgroup_level", or "subgroup".
@@ -50,11 +60,9 @@ or "subgroup_level". NULL defaults to "comparison".}
 
 \item{palette}{Named colours for lower and upper scenarios.}
 
-\item{shapes_palette}{Optional object of class "cea_shapes".
-Its linetype definitions are used when supplied.}
+\item{shapes_palette}{Optional object of class "cea_shapes".}
 
-\item{alpha}{Bar fill opacity, between 0 and 1. Defaults to 0.40.
-Bar outlines retain their original, fully opaque colours.}
+\item{alpha}{Bar fill opacity, between 0 and 1.}
 
 \item{return_data}{Return plotting data instead of graphs.}
 }
@@ -76,20 +84,21 @@ relative impact = scenario value - baseline value
 
 The original economic values are preserved in the returned data.
 
+Parameter ranking is calculated independently for each plot when
+plot_by is active. Parameters with zero impact throughout an
+independent plot are excluded from its graphical representation.
+
+When plot_by = "none", a global ranking based on mean impact
+across analytical combinations is retained.
+
+Impact is defined as the maximum absolute deviation from baseline
+across the lower and upper scenarios.
+
 In relative mode, a vertical reference line is drawn at zero.
 In absolute mode, a vertical reference line is drawn at the
-baseline only when all series in the plot share the same
-baseline value. No common reference line is drawn when
-different baselines are present.
+baseline only when all series share the same baseline value.
 
 By default, independent plots are generated for each comparison.
 Overall mode does not facet automatically. Subgroups mode facets
 by subgroup variable and level.
-
-Passing "none" to plot_by generates a single combined plot.
-Passing "none" to facet_by disables faceting explicitly.
-
-When plot_by is active, the function returns a named list
-of ggplot objects, one for each level of the selected dimension.
-With return_data = TRUE, the same structure contains data frames.
 }

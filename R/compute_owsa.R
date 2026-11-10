@@ -1,24 +1,21 @@
-
 #' Compute One-Way Deterministic Sensitivity Analysis (OWSA)
 #'
 #' Performs a one-way deterministic sensitivity analysis of incremental
 #' costs, incremental effects, Incremental Cost-Effectiveness Ratios (ICERs),
 #' and incremental Net Monetary Benefits (NMBs).
 #'
-#' The function evaluates the impact of varying individual cost parameters
-#' between user-defined lower and upper bounds, while holding all other
-#' parameters constant.
+#' The function supports variations in resource unit costs and proportional
+#' variations in incremental effectiveness.
 #'
-#' Each parameter is linked to an individual-level resource utilization
-#' variable. Alternative costs are calculated by adjusting the original
-#' individual costs according to the difference between the scenario-specific
-#' and baseline unit costs.
+#' Cost parameters modify individual-level costs according to resource
+#' utilization. Effect parameters modify the incremental effect relative
+#' to the reference strategy, without modifying the reference effect.
 #'
-#' The function supports multiple datasets, intervention strategies,
-#' subgroup analyses and willingness-to-pay thresholds.
+#' Each parameter is varied independently while all other parameters
+#' remain at their baseline values.
 #'
-#' Results are organized hierarchically by dataset, overall population
-#' and subgroup, while also providing a consolidated results table.
+#' Multiple datasets, intervention strategies, subgroup analyses and
+#' willingness-to-pay thresholds are supported.
 #'
 #' @param data A data frame or a named list of data frames containing
 #'   individual-level costs, effects, resource utilization and strategies.
@@ -31,45 +28,81 @@
 #'
 #' @param ref Character string identifying the reference strategy.
 #'
-#' @param parameters A data frame containing the parameters to be varied.
-#'   The following columns are required:
+#' @param parameters Either:
 #'   \itemize{
-#'     \item \code{parameter}: parameter identifier.
-#'     \item \code{resource}: corresponding resource utilization variable.
-#'     \item \code{base}: baseline unit cost.
-#'     \item \code{lower}: lower parameter value.
-#'     \item \code{upper}: upper parameter value.
+#'     \item An object of class \code{cea_parameters}, created using
+#'       \code{define_cea_parameters()}.
+#'     \item A data frame specifying the sensitivity parameters.
 #'   }
 #'
-#' @param lambda Numeric vector of willingness-to-pay thresholds used
-#'   to calculate incremental NMBs. Defaults to 25000.
+#'   For data frames, required columns are:
+#'   \itemize{
+#'     \item \code{parameter}: unique parameter identifier.
+#'     \item \code{resource}: resource utilization variable for cost
+#'       parameters; \code{NA} for effect parameters.
+#'     \item \code{base}: baseline unit cost for cost parameters;
+#'       zero for effect parameters.
+#'     \item \code{lower}: lower unit cost or proportional effect variation.
+#'     \item \code{upper}: upper unit cost or proportional effect variation.
+#'   }
 #'
-#' @param subgroup_vars Optional character vector specifying subgroup
-#'   variables. Overall and subgroup-specific results are calculated.
+#'   Optional columns:
+#'   \itemize{
+#'     \item \code{type}: \code{"cost"} or \code{"effect"}.
+#'       Defaults to \code{"cost"} for backward compatibility.
+#'     \item \code{comparison}: target alternative strategy for effect
+#'       parameters. \code{NA} applies the same proportional variation
+#'       to each alternative's own incremental effect.
+#'       Not applicable to cost parameters.
+#'   }
+#'
+#'   When \code{parameters} is a \code{cea_parameters} object, its
+#'   deterministic specifications are automatically converted into
+#'   the internal parameter table. Parameters without deterministic
+#'   specifications are excluded from OWSA.
+#'
+#' @param lambda Numeric vector of willingness-to-pay thresholds.
+#'   Defaults to 25000.
+#'
+#' @param subgroup_vars Optional character vector of subgroup variables.
 #'
 #' @details
-#' Three scenarios are evaluated for each parameter: baseline, lower
-#' and upper. Only one parameter is varied at a time.
+#' Three scenarios are evaluated independently for each parameter:
+#' \code{baseline}, \code{lower} and \code{upper}.
 #'
-#' Individual-level costs are recalculated as:
+#' For cost parameters, individual-level costs are recalculated as:
 #' \deqn{C_{i,new} = C_{i,base} + R_i(P_{new} - P_{base})}
 #'
-#' Incremental NMB is calculated separately for each threshold:
+#' For effect parameters, incremental effectiveness is recalculated as:
+#' \deqn{\Delta E_{new} = \Delta E_{base}(1+p)}
+#'
+#' Here, \eqn{p} is the proportional variation. For example,
+#' \code{-0.20} represents a 20 percent reduction and \code{0.20}
+#' represents a 20 percent increase.
+#'
+#' Effect parameters must have \code{base = 0}, and their lower
+#' variation must be greater than or equal to \code{-1}.
+#' The reference strategy remains unchanged.
+#'
+#' When \code{comparison} identifies a particular strategy, only its
+#' incremental effect is modified. Other comparisons retain their
+#' baseline incremental effects.
+#'
+#' Incremental NMB is calculated as:
 #' \deqn{NMB(\lambda) = \lambda \Delta E - \Delta C}
 #'
-#' NMB columns follow the same naming convention as compute_icers():
-#' NMB_15000, NMB_25000, etc.
+#' NMB columns follow the naming convention used by
+#' \code{compute_icers()}, such as \code{NMB_25000}.
 #'
 #' The analysis is deterministic and does not perform bootstrap resampling.
 #'
 #' @return
 #' An object of class \code{owsa_result} containing:
 #' \itemize{
-#'   \item One element per dataset, with \code{Overall} and
-#'         \code{Subgroups} components containing scenario-specific
-#'         economic results.
+#'   \item One element per dataset with \code{Overall} and
+#'     \code{Subgroups} results.
 #'   \item \code{sensitivity_results}: consolidated results table.
-#'   \item \code{parameters}: parameter specification table.
+#'   \item \code{parameters}: normalized parameter specification table.
 #'   \item \code{settings}: analysis settings and metadata.
 #' }
 #'
@@ -104,8 +137,69 @@ compute_owsa <- function(
     subgroup_vars = NULL
 ) {
 
+
   # ---------------------------------------------------------------------------
-  # 1. Validate parameters
+  # 1. Convert cea_parameters objects to the internal OWSA parameter table
+  # ---------------------------------------------------------------------------
+  if (inherits(parameters, "cea_parameters")) {
+
+    parameter_names <- names(parameters)
+
+    # Identify parameters without deterministic specifications
+    excluded_parameters <- parameter_names[
+      vapply(
+        parameters,
+        function(p) is.null(p$deterministic),
+        logical(1)
+      )
+    ]
+
+    # Inform the user about excluded parameters
+    if (length(excluded_parameters) > 0L) {
+
+      warning(
+        "The following parameters were excluded from OWSA ",
+        "because they have no deterministic specification: ",
+        paste(excluded_parameters, collapse = ", "),
+        call. = FALSE
+      )
+    }
+
+    # Convert eligible parameters to the internal data.frame
+    parameters <- do.call(
+      rbind,
+      lapply(parameter_names, function(name) {
+
+        p <- parameters[[name]]
+
+        if (is.null(p$deterministic)) {
+          return(NULL)
+        }
+
+        data.frame(
+          parameter = name,
+          type = p$type,
+          resource = p$resource,
+          comparison = p$comparison,
+          base = p$deterministic$base,
+          lower = p$deterministic$lower,
+          upper = p$deterministic$upper,
+          stringsAsFactors = FALSE
+        )
+      })
+    )
+
+    if (is.null(parameters) || nrow(parameters) == 0L) {
+      stop(
+        "No parameters with deterministic specifications ",
+        "are available for OWSA."
+      )
+    }
+  }
+
+
+  # ---------------------------------------------------------------------------
+  # 2. Validate and normalize parameters
   # ---------------------------------------------------------------------------
   required <- c("parameter", "resource", "base", "lower", "upper")
 
@@ -115,16 +209,96 @@ compute_owsa <- function(
     stop("Invalid parameters table.")
   }
 
+  if (!"type" %in% names(parameters)) {
+    parameters$type <- "cost"
+  }
+
+  if (!"comparison" %in% names(parameters)) {
+    parameters$comparison <- NA_character_
+  }
+
+  parameters$type <- as.character(parameters$type)
+  parameters$comparison <- as.character(parameters$comparison)
+  parameters$resource <- as.character(parameters$resource)
+
+  if (!is.character(parameters$parameter) &&
+      !is.factor(parameters$parameter)) {
+    stop("'parameter' must contain character identifiers.")
+  }
+
+  parameters$parameter <- as.character(parameters$parameter)
+
+  if (anyNA(parameters$parameter) ||
+      any(!nzchar(parameters$parameter)) ||
+      anyDuplicated(parameters$parameter)) {
+    stop("Invalid or duplicated parameter identifiers.")
+  }
+
+  if (anyNA(parameters$type) ||
+      !all(parameters$type %in% c("cost", "effect"))) {
+    stop("'type' must be 'cost' or 'effect'.")
+  }
+
   if (!all(vapply(
     parameters[c("base", "lower", "upper")],
     is.numeric,
     logical(1)
-  )) ||
-  anyNA(parameters[required]) ||
-  any(parameters$lower > parameters$base) ||
-  any(parameters$base > parameters$upper) ||
-  anyDuplicated(parameters$parameter)) {
-    stop("Invalid parameter values, limits or identifiers.")
+  ))) {
+    stop("Parameter values must be numeric.")
+  }
+
+  parameter_values <- as.matrix(
+    parameters[c("base", "lower", "upper")]
+  )
+
+  if (any(!is.finite(parameter_values)) ||
+      any(parameters$lower > parameters$base) ||
+      any(parameters$base > parameters$upper)) {
+    stop("Invalid parameter values or limits.")
+  }
+
+  cost_rows <- parameters$type == "cost"
+  effect_rows <- parameters$type == "effect"
+
+  if (any(cost_rows)) {
+
+    if (anyNA(parameters$resource[cost_rows]) ||
+        any(!nzchar(parameters$resource[cost_rows]))) {
+      stop("Cost parameters require a valid resource variable.")
+    }
+
+    if (any(!is.na(parameters$comparison[cost_rows]))) {
+      stop(
+        "'comparison' is only applicable to effect parameters."
+      )
+    }
+  }
+
+  if (any(effect_rows)) {
+
+    if (any(parameters$base[effect_rows] != 0)) {
+      stop("Effect parameters must have 'base = 0'.")
+    }
+
+    if (any(parameters$lower[effect_rows] < -1)) {
+      stop(
+        "Effect variations cannot be lower than -1 ",
+        "(a 100 percent reduction)."
+      )
+    }
+
+    if (any(!is.na(parameters$resource[effect_rows]))) {
+      stop("Effect parameters must have 'resource = NA'.")
+    }
+
+    specified_comparisons <- parameters$comparison[effect_rows]
+    specified_comparisons <- specified_comparisons[
+      !is.na(specified_comparisons)
+    ]
+
+    if (any(!nzchar(specified_comparisons))) {
+      stop("Effect comparison identifiers cannot be empty.")
+    }
   }
 
   # Validate willingness-to-pay thresholds
@@ -139,15 +313,14 @@ compute_owsa <- function(
     )
   }
 
-  # NMB column names consistent with compute_icers()
   nmb_names <- paste0("NMB_", lambda)
 
   if (anyDuplicated(nmb_names)) {
     stop("Lambda values produce duplicated NMB column names.")
   }
 
-  if (!is.character(subgroup_vars) &&
-      !is.null(subgroup_vars)) {
+  if (!is.null(subgroup_vars) &&
+      !is.character(subgroup_vars)) {
     stop("'subgroup_vars' must be a character vector.")
   }
 
@@ -156,7 +329,7 @@ compute_owsa <- function(
   }
 
   # ---------------------------------------------------------------------------
-  # 2. Normalize datasets
+  # 3. Normalize datasets
   # ---------------------------------------------------------------------------
   if (is.data.frame(data)) {
 
@@ -190,7 +363,6 @@ compute_owsa <- function(
     stop("Dataset names must be unique.")
   }
 
-  # Prevent collisions with reserved result components
   reserved_names <- c(
     "sensitivity_results",
     "parameters",
@@ -207,17 +379,19 @@ compute_owsa <- function(
   names(datasets) <- dataset_names
 
   # ---------------------------------------------------------------------------
-  # 3. Validate each dataset
+  # 4. Validate each dataset
   # ---------------------------------------------------------------------------
   for (dataset_name in names(datasets)) {
 
     df <- datasets[[dataset_name]]
 
+    cost_resources <- parameters$resource[cost_rows]
+
     required_vars <- unique(c(
       group,
       cost,
       effect,
-      parameters$resource,
+      cost_resources,
       subgroup_vars
     ))
 
@@ -231,7 +405,7 @@ compute_owsa <- function(
     numeric_vars <- unique(c(
       cost,
       effect,
-      parameters$resource
+      cost_resources
     ))
 
     if (!all(vapply(
@@ -258,10 +432,28 @@ compute_owsa <- function(
         dataset_name
       )
     }
+
+    alternatives <- unique(as.character(df[[group]]))
+    alternatives <- alternatives[alternatives != ref]
+
+    specified_comparisons <- unique(
+      parameters$comparison[effect_rows]
+    )
+
+    specified_comparisons <- specified_comparisons[
+      !is.na(specified_comparisons)
+    ]
+
+    if (!all(specified_comparisons %in% alternatives)) {
+      stop(
+        "Unknown effect comparison in dataset: ",
+        dataset_name
+      )
+    }
   }
 
   # ---------------------------------------------------------------------------
-  # 4. Core OWSA calculation
+  # 5. Core OWSA calculation
   # ---------------------------------------------------------------------------
   compute_stratum <- function(
     df,
@@ -295,9 +487,13 @@ compute_owsa <- function(
 
         modified_data <- df
 
-        modified_data[[cost]] <- df[[cost]] +
-          df[[parameter_row$resource]] *
-          (scenarios[[scenario]] - parameter_row$base)
+        # Cost parameters: adjust individual-level costs
+        if (parameter_row$type == "cost") {
+
+          modified_data[[cost]] <- df[[cost]] +
+            df[[parameter_row$resource]] *
+            (scenarios[[scenario]] - parameter_row$base)
+        }
 
         summary <- stats::aggregate(
           modified_data[c(cost, effect)],
@@ -317,13 +513,29 @@ compute_owsa <- function(
         summary$delta_effect <-
           summary[[effect]] - reference[[effect]]
 
+        # Effect parameters: adjust incremental effectiveness
+        if (parameter_row$type == "effect") {
+
+          target <- parameter_row$comparison
+
+          selected <- summary$group != ref
+
+          if (!is.na(target)) {
+            selected <- selected &
+              as.character(summary$group) == target
+          }
+
+          summary$delta_effect[selected] <-
+            summary$delta_effect[selected] *
+            (1 + scenarios[[scenario]])
+        }
+
         summary$icer <- ifelse(
           summary$delta_effect == 0,
           NA_real_,
           summary$delta_cost / summary$delta_effect
         )
 
-        # Calculate NMB for every willingness-to-pay threshold
         for (j in seq_along(lambda)) {
 
           summary[[nmb_names[j]]] <-
@@ -370,7 +582,7 @@ compute_owsa <- function(
   }
 
   # ---------------------------------------------------------------------------
-  # 5. Iterate over datasets and subgroups
+  # 6. Iterate over datasets and subgroups
   # ---------------------------------------------------------------------------
   all_results <- list()
   result_index <- 0L
@@ -379,7 +591,6 @@ compute_owsa <- function(
 
     df <- datasets[[dataset_name]]
 
-    # Overall population
     result_index <- result_index + 1L
 
     all_results[[result_index]] <- compute_stratum(
@@ -389,7 +600,6 @@ compute_owsa <- function(
       subgroup_level = "Overall"
     )
 
-    # Individual subgroup variables
     for (subgroup_var in subgroup_vars) {
 
       levels <- unique(df[[subgroup_var]])
@@ -425,7 +635,7 @@ compute_owsa <- function(
   sensitivity_results <- dplyr::bind_rows(all_results)
 
   # ---------------------------------------------------------------------------
-  # 6. Standardize dimensions
+  # 7. Standardize dimensions
   # ---------------------------------------------------------------------------
   sensitivity_results <- sensitivity_results |>
     dplyr::relocate(
@@ -440,7 +650,7 @@ compute_owsa <- function(
     )
 
   # ---------------------------------------------------------------------------
-  # 7. Organize results by dataset and subgroup
+  # 8. Organize results by dataset and subgroup
   # ---------------------------------------------------------------------------
   nested_results <- lapply(names(datasets), function(dataset_name) {
 
@@ -450,7 +660,6 @@ compute_owsa <- function(
       drop = FALSE
     ]
 
-    # Overall population
     overall_results <- dataset_results[
       dataset_results$subgroup_var == "Overall" &
         dataset_results$subgroup_level == "Overall",
@@ -458,7 +667,6 @@ compute_owsa <- function(
       drop = FALSE
     ]
 
-    # Subgroup-specific results
     subgroup_results <- NULL
 
     if (!is.null(subgroup_vars)) {
@@ -504,7 +712,7 @@ compute_owsa <- function(
   names(nested_results) <- names(datasets)
 
   # ---------------------------------------------------------------------------
-  # 8. Return structured results
+  # 9. Return structured results
   # ---------------------------------------------------------------------------
   result <- c(
     nested_results,
