@@ -1,3 +1,4 @@
+
 #' Compute Incremental Cost-Effectiveness Ratios (ICERs) Using Nonparametric Bootstrap
 #'
 #' Core analytical function of the CEAgroupR package. This function implements
@@ -23,6 +24,10 @@
 #' strategy comparison and subgroup stratum. When subgroup variables are
 #' provided, analyses are conducted separately for each subgroup level in
 #' addition to the overall population.
+#'
+#' When \code{reset_seed = TRUE}, the random seed is reset before analysing
+#' each dataset. This supports consistent bootstrap resampling across
+#' alternative versions of the same underlying study population.
 #'
 #' When \code{verbose = TRUE}, the function reports a compact global progress
 #' indicator (0--100\%) across all bootstrap iterations, including dataset
@@ -56,6 +61,10 @@
 #'
 #' @param seed Optional integer seed for reproducibility of bootstrap resampling.
 #'
+#' When multiple datasets are supplied, the random seed is automatically reset before analysing each dataset.
+#' This facilitates consistent bootstrap resampling across alternative versions of the same underlying population.
+#' Identical bootstrap samples are obtained only when datasets share the same observations, ordering and resampling structure.
+#'
 #' @param verbose Logical; if \code{TRUE}, prints a compact global progress
 #'   indicator across all bootstrap iterations.
 #'
@@ -72,6 +81,10 @@
 #' all graphical and post-processing functions provided by CEAgroupR.
 #' This design ensures full traceability and reproducibility of results
 #' across strategies, subgroups and analytical scenarios.
+#'
+#' Resetting the seed does not guarantee paired bootstrap samples when
+#' datasets contain different participants, missing observations, different
+#' ordering or different subgroup structures.
 #'
 #' @return
 #' An object of class \code{cea_results_list} containing, for each dataset:
@@ -101,13 +114,13 @@
 #' )
 #'
 #' res_multi <- compute_icers(
-#'   data      = data_list,
-#'   group     = "group",
-#'   cost      = "cost_total",
-#'   effect    = "effect",
-#'   ref_group = "usual_care",
-#'   R         = 50,
-#'   seed      = 123
+#'   data       = data_list,
+#'   group      = "group",
+#'   cost       = "cost_total",
+#'   effect     = "effect",
+#'   ref_group  = "usual_care",
+#'   R          = 50,
+#'   seed       = 123
 #' )
 #'
 #' @export
@@ -340,11 +353,17 @@ compute_icers <- function(
   # ============================================================
   result <- lapply(
     names(data_list),
-    function(nm) analyze_with_subgroups(data_list[[nm]], nm)
+    function(nm) {
+
+      # Reset seed before each dataset
+      set.seed(seed)
+
+      analyze_with_subgroups(data_list[[nm]], nm)
+    }
   )
 
   names(result) <- names(data_list)
-  class(result) <- c("cea_results_list","list")
+  class(result) <- c("cea_results_list", "list")
 
   # ============================================================
   # 8. Combine + Summary

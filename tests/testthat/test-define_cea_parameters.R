@@ -61,6 +61,11 @@ test_that("define_cea_parameters supports deterministic and probabilistic specif
 
   expect_named(
     parameters,
+    c("summary", "parameters")
+  )
+
+  expect_named(
+    parameters$parameters,
     c(
       "gp_visit",
       "adherence",
@@ -70,11 +75,14 @@ test_that("define_cea_parameters supports deterministic and probabilistic specif
     )
   )
 
-  expect_equal(parameters$gp_visit$deterministic$base, 65)
+  expect_equal(
+    parameters$parameters$gp_visit$deterministic$base,
+    65
+  )
 
   expect_equal(
     vapply(
-      parameters,
+      parameters$parameters,
       function(p) p$probabilistic$distribution,
       character(1)
     ),

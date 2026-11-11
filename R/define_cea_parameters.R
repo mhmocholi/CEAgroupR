@@ -1,14 +1,17 @@
 
-#' Define Parameters for Cost-Effectiveness Sensitivity Analysis
+#' Define Parameters for Cost-Effectiveness Sensitivity and Scenario Analyses
 #'
 #' Constructs a structured collection of parameters for deterministic
-#' and probabilistic sensitivity analyses in CEAgroupR.
+#' sensitivity analysis, probabilistic sensitivity analysis and
+#' scenario analysis in CEAgroupR.
 #'
 #' Each parameter must contain at least one specification:
-#' deterministic, probabilistic, or both.
+#' deterministic, probabilistic or scenarios.
+#' Any combination of these specifications is permitted.
 #'
 #' Deterministic specifications are used by OWSA and TWSA.
 #' Probabilistic specifications are intended for PSA.
+#' Scenario specifications are intended for scenario analysis.
 #'
 #' @param ... Named parameter definitions created with list().
 #'   Each parameter may contain:
@@ -18,6 +21,7 @@
 #'     \item \code{comparison}: optional target comparison for effects.
 #'     \item \code{deterministic}: optional list with base, lower, upper.
 #'     \item \code{probabilistic}: optional distribution specification.
+#'     \item \code{scenarios}: optional named list of scenario values.
 #'   }
 #'
 #' @details
@@ -44,16 +48,34 @@
 #' proportional adjustments to incremental effectiveness.
 #' Their application will be implemented in the PSA engine.
 #'
-#' Deterministic and probabilistic specifications are independent.
-#' No equality between deterministic baseline values and
-#' probabilistic distribution means is imposed.
+#' Scenario specifications contain one or more named numeric values.
+#' Scenario names must be unique and non-empty.
+#'
+#' For cost parameters, scenario values represent alternative
+#' unit costs and must be non-negative.
+#'
+#' For effect parameters, scenario values represent proportional
+#' changes in incremental effectiveness and must be >= -1.
+#' For example, a value of 0.20 represents a 20% increase.
+#'
+#' Scenario names may be shared across different parameters.
+#' The interpretation and combination of these scenarios
+#' are determined by the scenario analysis engine.
+#'
+#' Deterministic, probabilistic and scenario specifications
+#' are independent. No equality between deterministic baseline
+#' values and probabilistic distribution means is imposed.
 #'
 #' A methodological warning may be issued when a distribution
 #' assigned to a cost parameter permits negative values.
 #' No truncation or restriction is applied.
 #'
-#' @return An object of class \code{cea_parameters}, containing
-#'   named parameter definitions.
+#' @return An object of class \code{cea_parameters} containing:
+#'   \itemize{
+#'     \item \code{summary}: tabular summaries of the available
+#'       deterministic, probabilistic and scenario specifications.
+#'     \item \code{parameters}: complete validated parameter definitions.
+#'   }
 #'
 #' @examples
 #' parameters <- define_cea_parameters(
@@ -69,6 +91,10 @@
 #'       distribution = "gamma",
 #'       shape = 25,
 #'       rate = 25 / 65
+#'     ),
+#'     scenarios = list(
+#'       optimistic = 21,
+#'       pessimistic = 134
 #'     )
 #'   ),
 #'   hospital_day = list(
@@ -78,6 +104,10 @@
 #'       base = 650,
 #'       lower = 500,
 #'       upper = 800
+#'     ),
+#'     scenarios = list(
+#'       optimistic = 500,
+#'       pessimistic = 900
 #'     )
 #'   ),
 #'   qaly_general = list(
@@ -90,6 +120,10 @@
 #'     )
 #'   )
 #' )
+#'
+#' parameters
+#' parameters$summary$scenarios
+#' parameters$parameters$gp_visit
 #'
 #' @export
 define_cea_parameters <- function(...) {
@@ -174,7 +208,8 @@ define_cea_parameters <- function(...) {
       "resource",
       "comparison",
       "deterministic",
-      "probabilistic"
+      "probabilistic",
+      "scenarios"
     )
 
     validate_fields(
@@ -267,16 +302,20 @@ define_cea_parameters <- function(...) {
 
     deterministic <- parameter$deterministic
     probabilistic <- parameter$probabilistic
+    scenarios <- parameter$scenarios
 
     has_deterministic <- !is.null(deterministic)
     has_probabilistic <- !is.null(probabilistic)
+    has_scenarios <- !is.null(scenarios)
 
-    if (!has_deterministic && !has_probabilistic) {
+    if (!has_deterministic &&
+        !has_probabilistic &&
+        !has_scenarios) {
 
       stop(
         "Parameter '", name,
         "': at least one specification is required: ",
-        "'deterministic' or 'probabilistic'."
+        "'deterministic', 'probabilistic' or 'scenarios'."
       )
     }
 
@@ -550,7 +589,67 @@ define_cea_parameters <- function(...) {
     }
 
     # -------------------------------------------------------------------------
-    # 3.5. Store normalized parameter
+    # 3.5. Validate scenario specification
+    # -------------------------------------------------------------------------
+
+    if (has_scenarios) {
+
+      if (!is.list(scenarios) || length(scenarios) == 0L) {
+
+        stop(
+          "Parameter '", name,
+          "': 'scenarios' must be a non-empty named list."
+        )
+      }
+
+      scenario_names <- names(scenarios)
+
+      if (is.null(scenario_names) ||
+          anyNA(scenario_names) ||
+          any(!nzchar(scenario_names)) ||
+          anyDuplicated(scenario_names)) {
+
+        stop(
+          "Parameter '", name,
+          "': scenarios must have unique, non-empty names."
+        )
+      }
+
+      for (scenario_name in scenario_names) {
+
+        value <- scenarios[[scenario_name]]
+
+        validate_scalar(
+          value = value,
+          field = paste0("scenarios$", scenario_name),
+          parameter = name
+        )
+
+        if (type == "cost" && value < 0) {
+
+          stop(
+            "Parameter '", name,
+            "': scenario '", scenario_name,
+            "' cannot have a negative unit cost."
+          )
+        }
+
+        if (type == "effect" && value < -1) {
+
+          stop(
+            "Parameter '", name,
+            "': scenario '", scenario_name,
+            "' cannot represent an effect variation below -1."
+          )
+        }
+      }
+
+      # Preserve scenario names and values
+      scenarios <- scenarios[scenario_names]
+    }
+
+    # -------------------------------------------------------------------------
+    # 3.6. Store normalized parameter
     # -------------------------------------------------------------------------
 
     normalized_parameter <- list(
@@ -567,17 +666,39 @@ define_cea_parameters <- function(...) {
       normalized_parameter$probabilistic <- probabilistic
     }
 
+    if (has_scenarios) {
+      normalized_parameter$scenarios <- scenarios
+    }
+
     parameters[[name]] <- normalized_parameter
   }
 
   # ---------------------------------------------------------------------------
-  # 4. Return structured object
+  # 4. Build structured output
   # ---------------------------------------------------------------------------
 
-  class(parameters) <- c(
+  # Generate summary from validated definitions using the
+  # existing summary.cea_parameters() implementation.
+
+  parameter_definitions <- parameters
+
+  class(parameter_definitions) <- c(
     "cea_parameters",
     "list"
   )
 
-  return(parameters)
+  parameter_summary <- summary(parameter_definitions)
+
+  # Store summary and definitions as separate components.
+  result <- list(
+    summary = parameter_summary,
+    parameters = parameters
+  )
+
+  class(result) <- c(
+    "cea_parameters",
+    "list"
+  )
+
+  return(result)
 }

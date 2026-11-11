@@ -141,14 +141,31 @@ compute_owsa <- function(
   # ---------------------------------------------------------------------------
   # 1. Convert cea_parameters objects to the internal OWSA parameter table
   # ---------------------------------------------------------------------------
+
+  # ---------------------------------------------------------------------------
+  # 1. Convert cea_parameters objects to the internal OWSA parameter table
+  # ---------------------------------------------------------------------------
+
   if (inherits(parameters, "cea_parameters")) {
 
-    parameter_names <- names(parameters)
+    # Extract validated definitions from the structured object
+    parameter_definitions <- parameters$parameters
+
+    if (!is.list(parameter_definitions) ||
+        length(parameter_definitions) == 0L) {
+
+      stop(
+        "Invalid 'cea_parameters' object: ",
+        "no parameter definitions were found."
+      )
+    }
+
+    parameter_names <- names(parameter_definitions)
 
     # Identify parameters without deterministic specifications
     excluded_parameters <- parameter_names[
       vapply(
-        parameters,
+        parameter_definitions,
         function(p) is.null(p$deterministic),
         logical(1)
       )
@@ -170,7 +187,7 @@ compute_owsa <- function(
       rbind,
       lapply(parameter_names, function(name) {
 
-        p <- parameters[[name]]
+        p <- parameter_definitions[[name]]
 
         if (is.null(p$deterministic)) {
           return(NULL)
@@ -190,12 +207,14 @@ compute_owsa <- function(
     )
 
     if (is.null(parameters) || nrow(parameters) == 0L) {
+
       stop(
         "No parameters with deterministic specifications ",
         "are available for OWSA."
       )
     }
   }
+
 
 
   # ---------------------------------------------------------------------------

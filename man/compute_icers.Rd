@@ -46,7 +46,11 @@ interval to compute. Passed to \code{\link[boot]{boot.ci}} (e.g. \code{"bca"},
 subgroup variables. When provided, analyses are conducted separately
 for each subgroup level in addition to the overall population.}
 
-\item{seed}{Optional integer seed for reproducibility of bootstrap resampling.}
+\item{seed}{Optional integer seed for reproducibility of bootstrap resampling.
+
+When multiple datasets are supplied, the random seed is automatically reset before analysing each dataset.
+This facilitates consistent bootstrap resampling across alternative versions of the same underlying population.
+Identical bootstrap samples are obtained only when datasets share the same observations, ordering and resampling structure.}
 
 \item{verbose}{Logical; if \code{TRUE}, prints a compact global progress
 indicator across all bootstrap iterations.}
@@ -93,6 +97,10 @@ strategy comparison and subgroup stratum. When subgroup variables are
 provided, analyses are conducted separately for each subgroup level in
 addition to the overall population.
 
+When \code{reset_seed = TRUE}, the random seed is reset before analysing
+each dataset. This supports consistent bootstrap resampling across
+alternative versions of the same underlying study population.
+
 When \code{verbose = TRUE}, the function reports a compact global progress
 indicator (0--100\\%) across all bootstrap iterations, including dataset
 and subgroup-level headers.
@@ -102,6 +110,10 @@ pre-computed summaries, and is structured to be directly compatible with
 all graphical and post-processing functions provided by CEAgroupR.
 This design ensures full traceability and reproducibility of results
 across strategies, subgroups and analytical scenarios.
+
+Resetting the seed does not guarantee paired bootstrap samples when
+datasets contain different participants, missing observations, different
+ordering or different subgroup structures.
 }
 \examples{
 ## Example 1: Basic cost-effectiveness analysis (single dataset)
@@ -122,13 +134,13 @@ data_list <- list(
 )
 
 res_multi <- compute_icers(
-  data      = data_list,
-  group     = "group",
-  cost      = "cost_total",
-  effect    = "effect",
-  ref_group = "usual_care",
-  R         = 50,
-  seed      = 123
+  data       = data_list,
+  group      = "group",
+  cost       = "cost_total",
+  effect     = "effect",
+  ref_group  = "usual_care",
+  R          = 50,
+  seed       = 123
 )
 
 }

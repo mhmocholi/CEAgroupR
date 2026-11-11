@@ -2,7 +2,7 @@
 % Please edit documentation in R/define_cea_parameters.R
 \name{define_cea_parameters}
 \alias{define_cea_parameters}
-\title{Define Parameters for Cost-Effectiveness Sensitivity Analysis}
+\title{Define Parameters for Cost-Effectiveness Sensitivity and Scenario Analyses}
 \usage{
 define_cea_parameters(...)
 }
@@ -15,22 +15,30 @@ Each parameter may contain:
 \item \code{comparison}: optional target comparison for effects.
 \item \code{deterministic}: optional list with base, lower, upper.
 \item \code{probabilistic}: optional distribution specification.
+\item \code{scenarios}: optional named list of scenario values.
 }}
 }
 \value{
-An object of class \code{cea_parameters}, containing
-named parameter definitions.
+An object of class \code{cea_parameters} containing:
+\itemize{
+\item \code{summary}: tabular summaries of the available
+deterministic, probabilistic and scenario specifications.
+\item \code{parameters}: complete validated parameter definitions.
+}
 }
 \description{
 Constructs a structured collection of parameters for deterministic
-and probabilistic sensitivity analyses in CEAgroupR.
+sensitivity analysis, probabilistic sensitivity analysis and
+scenario analysis in CEAgroupR.
 }
 \details{
 Each parameter must contain at least one specification:
-deterministic, probabilistic, or both.
+deterministic, probabilistic or scenarios.
+Any combination of these specifications is permitted.
 
 Deterministic specifications are used by OWSA and TWSA.
 Probabilistic specifications are intended for PSA.
+Scenario specifications are intended for scenario analysis.
 
 Supported probabilistic distributions:
 
@@ -55,9 +63,23 @@ Probabilistic effect parameters are intended to represent
 proportional adjustments to incremental effectiveness.
 Their application will be implemented in the PSA engine.
 
-Deterministic and probabilistic specifications are independent.
-No equality between deterministic baseline values and
-probabilistic distribution means is imposed.
+Scenario specifications contain one or more named numeric values.
+Scenario names must be unique and non-empty.
+
+For cost parameters, scenario values represent alternative
+unit costs and must be non-negative.
+
+For effect parameters, scenario values represent proportional
+changes in incremental effectiveness and must be >= -1.
+For example, a value of 0.20 represents a 20\% increase.
+
+Scenario names may be shared across different parameters.
+The interpretation and combination of these scenarios
+are determined by the scenario analysis engine.
+
+Deterministic, probabilistic and scenario specifications
+are independent. No equality between deterministic baseline
+values and probabilistic distribution means is imposed.
 
 A methodological warning may be issued when a distribution
 assigned to a cost parameter permits negative values.
@@ -77,6 +99,10 @@ parameters <- define_cea_parameters(
       distribution = "gamma",
       shape = 25,
       rate = 25 / 65
+    ),
+    scenarios = list(
+      optimistic = 21,
+      pessimistic = 134
     )
   ),
   hospital_day = list(
@@ -86,6 +112,10 @@ parameters <- define_cea_parameters(
       base = 650,
       lower = 500,
       upper = 800
+    ),
+    scenarios = list(
+      optimistic = 500,
+      pessimistic = 900
     )
   ),
   qaly_general = list(
@@ -98,5 +128,9 @@ parameters <- define_cea_parameters(
     )
   )
 )
+
+parameters
+parameters$summary$scenarios
+parameters$parameters$gp_visit
 
 }
