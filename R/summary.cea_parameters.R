@@ -12,11 +12,15 @@
 #'   Only specifications present in the parameter definitions
 #'   are included.
 #'
+#'   Scenario summaries include the baseline value and the
+#'   alternative values defined for each scenario.
+#'
 #' @examples
 #' parameters <- define_cea_parameters(
 #'   gp_visit = list(
 #'     type = "cost",
 #'     resource = "gp_visits",
+#'     base = 65,
 #'     deterministic = list(base = 65, lower = 50, upper = 80),
 #'     scenarios = list(optimistic = 21, pessimistic = 134)
 #'   )
@@ -134,6 +138,7 @@ summary.cea_parameters <- function(object, ...) {
 
       scenario_records[[name]] <- c(
         common,
+        list(base = parameter$base),
         parameter$scenarios
       )
     }

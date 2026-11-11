@@ -13,6 +13,9 @@ Each parameter may contain:
 \item \code{type}: "cost" or "effect".
 \item \code{resource}: resource utilization variable for costs.
 \item \code{comparison}: optional target comparison for effects.
+\item \code{base}: optional baseline value, required when
+scenarios are defined. For cost parameters, this is the
+original unit cost. For effect parameters, it must be 0.
 \item \code{deterministic}: optional list with base, lower, upper.
 \item \code{probabilistic}: optional distribution specification.
 \item \code{scenarios}: optional named list of scenario values.
@@ -66,12 +69,19 @@ Their application will be implemented in the PSA engine.
 Scenario specifications contain one or more named numeric values.
 Scenario names must be unique and non-empty.
 
-For cost parameters, scenario values represent alternative
-unit costs and must be non-negative.
+A baseline value must be explicitly provided whenever scenarios
+are defined, independently of the deterministic specification.
 
-For effect parameters, scenario values represent proportional
-changes in incremental effectiveness and must be >= -1.
-For example, a value of 0.20 represents a 20\% increase.
+For cost parameters, the baseline represents the original unit
+cost incorporated into the dataset. Scenario values represent
+alternative unit costs and must be non-negative.
+
+For effect parameters, the baseline must be 0. Scenario values
+represent proportional changes in incremental effectiveness
+and must be >= -1. For example, 0.20 represents a 20\% increase.
+
+When both a top-level baseline and a deterministic specification
+are provided, their baseline values must match.
 
 Scenario names may be shared across different parameters.
 The interpretation and combination of these scenarios
@@ -90,6 +100,7 @@ parameters <- define_cea_parameters(
   gp_visit = list(
     type = "cost",
     resource = "gp_visits",
+    base = 65,
     deterministic = list(
       base = 65,
       lower = 50,
@@ -108,6 +119,7 @@ parameters <- define_cea_parameters(
   hospital_day = list(
     type = "cost",
     resource = "hospital_days",
+    base = 650,
     deterministic = list(
       base = 650,
       lower = 500,

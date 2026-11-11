@@ -19,6 +19,9 @@
 #'     \item \code{type}: "cost" or "effect".
 #'     \item \code{resource}: resource utilization variable for costs.
 #'     \item \code{comparison}: optional target comparison for effects.
+#'     \item \code{base}: optional baseline value, required when
+#'       scenarios are defined. For cost parameters, this is the
+#'       original unit cost. For effect parameters, it must be 0.
 #'     \item \code{deterministic}: optional list with base, lower, upper.
 #'     \item \code{probabilistic}: optional distribution specification.
 #'     \item \code{scenarios}: optional named list of scenario values.
@@ -51,12 +54,19 @@
 #' Scenario specifications contain one or more named numeric values.
 #' Scenario names must be unique and non-empty.
 #'
-#' For cost parameters, scenario values represent alternative
-#' unit costs and must be non-negative.
+#' A baseline value must be explicitly provided whenever scenarios
+#' are defined, independently of the deterministic specification.
 #'
-#' For effect parameters, scenario values represent proportional
-#' changes in incremental effectiveness and must be >= -1.
-#' For example, a value of 0.20 represents a 20% increase.
+#' For cost parameters, the baseline represents the original unit
+#' cost incorporated into the dataset. Scenario values represent
+#' alternative unit costs and must be non-negative.
+#'
+#' For effect parameters, the baseline must be 0. Scenario values
+#' represent proportional changes in incremental effectiveness
+#' and must be >= -1. For example, 0.20 represents a 20% increase.
+#'
+#' When both a top-level baseline and a deterministic specification
+#' are provided, their baseline values must match.
 #'
 #' Scenario names may be shared across different parameters.
 #' The interpretation and combination of these scenarios
@@ -82,6 +92,7 @@
 #'   gp_visit = list(
 #'     type = "cost",
 #'     resource = "gp_visits",
+#'     base = 65,
 #'     deterministic = list(
 #'       base = 65,
 #'       lower = 50,
@@ -100,6 +111,7 @@
 #'   hospital_day = list(
 #'     type = "cost",
 #'     resource = "hospital_days",
+#'     base = 650,
 #'     deterministic = list(
 #'       base = 650,
 #'       lower = 500,
@@ -207,6 +219,7 @@ define_cea_parameters <- function(...) {
       "type",
       "resource",
       "comparison",
+      "base",
       "deterministic",
       "probabilistic",
       "scenarios"
@@ -320,6 +333,45 @@ define_cea_parameters <- function(...) {
     }
 
     # -------------------------------------------------------------------------
+    # 3.2.1. Validate baseline value
+    # -------------------------------------------------------------------------
+
+    base <- parameter$base
+
+    if (has_scenarios && is.null(base)) {
+
+      stop(
+        "Parameter '", name,
+        "': 'base' is required when scenarios are defined."
+      )
+    }
+
+    if (!is.null(base)) {
+
+      validate_scalar(
+        value = base,
+        field = "base",
+        parameter = name
+      )
+
+      if (type == "cost" && base < 0) {
+
+        stop(
+          "Parameter '", name,
+          "': baseline unit cost cannot be negative."
+        )
+      }
+
+      if (type == "effect" && base != 0) {
+
+        stop(
+          "Parameter '", name,
+          "': baseline effect variation must be 0."
+        )
+      }
+    }
+
+    # -------------------------------------------------------------------------
     # 3.3. Validate deterministic specification
     # -------------------------------------------------------------------------
 
@@ -356,6 +408,15 @@ define_cea_parameters <- function(...) {
         stop(
           "Parameter '", name,
           "': expected lower <= base <= upper."
+        )
+      }
+
+      if (!is.null(base) &&
+          deterministic$base != base) {
+
+        stop(
+          "Parameter '", name,
+          "': 'base' must match 'deterministic$base'."
         )
       }
 
@@ -657,6 +718,10 @@ define_cea_parameters <- function(...) {
       resource = resource,
       comparison = comparison
     )
+
+    if (!is.null(base)) {
+      normalized_parameter$base <- base
+    }
 
     if (has_deterministic) {
       normalized_parameter$deterministic <- deterministic
