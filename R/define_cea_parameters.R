@@ -338,11 +338,14 @@ define_cea_parameters <- function(...) {
 
     base <- parameter$base
 
-    if (has_scenarios && is.null(base)) {
+    if ((has_scenarios ||
+         (type == "cost" && has_probabilistic)) &&
+        is.null(base)) {
 
       stop(
         "Parameter '", name,
-        "': 'base' is required when scenarios are defined."
+        "': 'base' is required for scenario specifications ",
+        "and probabilistic cost parameters."
       )
     }
 
