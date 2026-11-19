@@ -40,7 +40,8 @@ the distribution. Supported values are \code{"histogram"},
 \code{"dataset"}; \code{"none"} disables mapping.}
 
 \item{facet_by}{Faceting directive: \code{"dataset"}, \code{"comparison"},
-\code{"subgroup_var"}, \code{"subgroup_level"}, or \code{"subgroup"}.
+\code{"subgroup_var"}, \code{"subgroup_level"}, \code{"subgroup"},
+or \code{"computed_by"}.
 \code{NULL} defaults to \code{"none"} in Overall mode and
 \code{"subgroup"} in Subgroups mode.}
 

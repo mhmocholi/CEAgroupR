@@ -1,3 +1,32 @@
+
+#' Combine Bootstrap Replicates Across CEA Datasets
+#'
+#' Extracts and combines bootstrap replicates from one or more
+#' cost-effectiveness analysis result objects into a single data frame.
+#'
+#' The function supports overall analyses, subgroup analyses, and
+#' multiple intervention comparisons. Each replicate is identified
+#' by its dataset, subgroup, comparison, and simulation method.
+#'
+#' @param ... One or more objects of class `cea_results`, or a
+#'   `cea_results_list` containing individual CEA result objects.
+#'
+#' @return A tibble containing the combined bootstrap replicates,
+#'   including dataset identifiers, subgroup information, intervention
+#'   comparisons, replicate numbers, simulation method (`computed_by`),
+#'   unique group identifiers (`group_uid`), and available economic
+#'   evaluation statistics.
+#'
+#' @details
+#' All extracted replicates are identified as bootstrap simulations.
+#' The function preserves the original economic evaluation statistics
+#' and constructs hierarchical identifiers to distinguish results
+#' across datasets, subgroups, and comparisons.
+#'
+#' @seealso [combine_boot_psa()]
+#'
+#' @export
+
 combine_icers_results <- function(...) {
 
   objects <- list(...)

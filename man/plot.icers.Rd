@@ -36,7 +36,8 @@ produced by \code{\link{combine_icers_results}}.}
 \code{"dataset"}; \code{"none"} disables mapping.}
 
 \item{facet_by}{Faceting directive: \code{"dataset"}, \code{"comparison"},
-\code{"subgroup_var"}, \code{"subgroup_level"}, or \code{"subgroup"}.
+\code{"subgroup_var"}, \code{"subgroup_level"}, \code{"subgroup"},
+or \code{"computed_by"}.
 \code{NULL} defaults to \code{"none"} in Overall mode and
 \code{"subgroup"} in Subgroups mode.}
 
@@ -49,7 +50,7 @@ single combined plot.}
 
 \item{filter_expr}{Optional tidyverse-style filtering expression.}
 
-\item{show_points}{Display bootstrap replicate clouds.}
+\item{show_points}{Display bootstrap or PSA replicate clouds.}
 
 \item{show_means}{Display mean incremental outcomes.}
 
@@ -87,6 +88,10 @@ flexible aesthetic mappings, and independent plots through \code{plot_by}.
 When \code{plot_by} is active, each plot is built from its own data subset.
 Colour and shape assignments are resolved globally so that the same
 analytical category retains the same appearance across independent plots.
+
+Non-parametric contours are omitted for groups without sufficient
+variability in both incremental cost and incremental effectiveness.
+This does not affect the underlying observations or mean estimates.
 }
 \examples{
 res <- compute_icers(
