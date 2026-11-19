@@ -15,7 +15,8 @@
 #' @param shape_by Variable used for point shapes. \code{NULL} defaults to
 #'   \code{"dataset"}; \code{"none"} disables mapping.
 #' @param facet_by Faceting directive: \code{"dataset"}, \code{"comparison"},
-#'   \code{"subgroup_var"}, \code{"subgroup_level"}, or \code{"subgroup"}.
+#'   \code{"subgroup_var"}, \code{"subgroup_level"}, \code{"subgroup"},
+#'   or \code{"computed_by"}.
 #'   \code{NULL} defaults to \code{"none"} in Overall mode and
 #'   \code{"subgroup"} in Subgroups mode.
 #' @param plot_by Dimension used to generate independent plots:
@@ -24,7 +25,7 @@
 #'   single combined plot.
 #' @param mode Either \code{"Overall"} or \code{"Subgroups"}.
 #' @param filter_expr Optional tidyverse-style filtering expression.
-#' @param show_points Display bootstrap replicate clouds.
+#' @param show_points Display bootstrap or PSA replicate clouds.
 #' @param show_means Display mean incremental outcomes.
 #' @param show_contours Display confidence contours.
 #' @param show_lambdas Display willingness-to-pay reference lines.
@@ -40,6 +41,10 @@
 #' When \code{plot_by} is active, each plot is built from its own data subset.
 #' Colour and shape assignments are resolved globally so that the same
 #' analytical category retains the same appearance across independent plots.
+#'
+#' Non-parametric contours are omitted for groups without sufficient
+#' variability in both incremental cost and incremental effectiveness.
+#' This does not affect the underlying observations or mean estimates.
 #'
 #' @return A \code{ggplot} object when \code{plot_by} is inactive, or a named
 #'   \code{cea_multplots} list of \code{ggplot} objects when it is active.
@@ -60,6 +65,7 @@
 #' @importFrom magrittr %>%
 #' @export
 #' @rawNamespace export(plot.icers)
+
 plot.icers <- function(
     data,
     color_by       = NULL,
@@ -80,11 +86,13 @@ plot.icers <- function(
     shapes_palette = NULL,
     ...
 ) {
+
   `%||%` <- function(a, b) if (!is.null(a)) a else b
 
   # ========================================================================
   # 1. Extract data
   # ========================================================================
+
   if (inherits(data, "cea_results_list")) {
     df <- data$combined_replicates
     lambda_vals <- data$settings$lambda
@@ -103,6 +111,7 @@ plot.icers <- function(
   # ========================================================================
   # 2. Filtering
   # ========================================================================
+
   if (!is.null(filter_expr)) {
     df <- dplyr::filter(df, !!rlang::parse_expr(filter_expr))
   }
@@ -110,12 +119,21 @@ plot.icers <- function(
   # ========================================================================
   # 3. Mode filtering
   # ========================================================================
+
   mode <- match.arg(mode, c("Overall", "Subgroups"))
 
   if (mode == "Overall") {
-    df <- df[df$subgroup_var == "Overall" | is.na(df$subgroup_var), , drop = FALSE]
+    df <- df[
+      df$subgroup_var == "Overall" | is.na(df$subgroup_var),
+      ,
+      drop = FALSE
+    ]
   } else {
-    df <- df[df$subgroup_var != "Overall" & !is.na(df$subgroup_var), , drop = FALSE]
+    df <- df[
+      df$subgroup_var != "Overall" & !is.na(df$subgroup_var),
+      ,
+      drop = FALSE
+    ]
   }
 
   if (nrow(df) == 0L) {
@@ -125,19 +143,30 @@ plot.icers <- function(
   # ========================================================================
   # 4. Default aesthetic mappings and independent plot directive
   # ========================================================================
+
   resolved_color <- color_by %||% "comparison"
   resolved_shape <- shape_by %||% "dataset"
-  resolved_facet <- facet_by %||% if (mode == "Subgroups") "subgroup" else "none"
-  resolved_plot  <- plot_by %||% "none"
+  resolved_facet <- facet_by %||%
+    if (mode == "Subgroups") "subgroup" else "none"
+  resolved_plot <- plot_by %||% "none"
 
   if (identical(resolved_color, "none")) resolved_color <- NULL
   if (identical(resolved_shape, "none")) resolved_shape <- NULL
   if (identical(resolved_facet, "none")) resolved_facet <- NULL
 
-  allowed_plot_by <- c("none", "dataset", "comparison",
-                       "subgroup_var", "subgroup_level")
-  if (!is.character(resolved_plot) || length(resolved_plot) != 1L ||
-      is.na(resolved_plot) || !resolved_plot %in% allowed_plot_by) {
+  allowed_plot_by <- c(
+    "none",
+    "dataset",
+    "comparison",
+    "subgroup_var",
+    "subgroup_level"
+  )
+
+  if (!is.character(resolved_plot) ||
+      length(resolved_plot) != 1L ||
+      is.na(resolved_plot) ||
+      !resolved_plot %in% allowed_plot_by) {
+
     stop(
       "'plot_by' must be one of: ",
       paste(allowed_plot_by, collapse = ", "),
@@ -145,13 +174,15 @@ plot.icers <- function(
       call. = FALSE
     )
   }
-  if (identical(resolved_plot, "none")) resolved_plot <- NULL
+
+  if (identical(resolved_plot, "none")) {
+    resolved_plot <- NULL
+  }
 
   # ========================================================================
   # 5. Global layout metadata and stable aesthetic scales
   # ========================================================================
-  # Resolve aesthetics once on the entire filtered dataset. This avoids
-  # assigning different colours or shapes to the same category across plots.
+
   global_base <- ce_plot_base(
     data           = df,
     color_by       = resolved_color,
@@ -167,40 +198,54 @@ plot.icers <- function(
   palette_vals  <- global_base$palette_values
   shape_vals    <- global_base$shape_values
   linetype_vals <- global_base$linetype_values
-  valid_color   <- !is.null(color_var)
-  valid_shape   <- !is.null(shape_var)
+
+  valid_color <- !is.null(color_var)
+  valid_shape <- !is.null(shape_var)
 
   if (valid_color) {
+
     color_levels <- unique(as.character(df[[color_var]]))
     pal <- palette_vals
+
     if (is.null(names(pal))) {
       pal <- rep(pal, length.out = length(color_levels))
       names(pal) <- color_levels
     }
+
     color_map <- pal[color_levels]
+
   } else {
+
     color_map <- c(fixed = unname(palette_vals[1]))
   }
 
   if (valid_shape) {
+
     shape_levels <- sort(unique(as.character(df[[shape_var]])))
     shape_map <- shape_vals[shape_levels]
+
   } else {
+
     shape_map <- NULL
   }
 
   # Preserve the requested order of appearance in the filtered dataset.
+
   plot_levels <- global_base$plot_levels
+
   if (!is.null(resolved_plot)) {
+
     if (anyNA(df[[resolved_plot]])) {
       stop("'plot_by' cannot contain missing values.", call. = FALSE)
     }
+
     plot_levels <- unique(as.character(df[[resolved_plot]]))
   }
 
   # ========================================================================
   # 6. Build one ICER plane
   # ========================================================================
+
   build_plot <- function(plot_df, plot_label = NULL) {
 
     base <- ce_plot_base(
@@ -218,7 +263,9 @@ plot.icers <- function(
     # ----------------------------------------------------------------------
     # 6.1 Colour and shape scales
     # ----------------------------------------------------------------------
+
     if (valid_color) {
+
       p <- p + ggplot2::scale_colour_manual(
         values = color_map,
         limits = names(color_map),
@@ -227,6 +274,7 @@ plot.icers <- function(
     }
 
     if (valid_shape) {
+
       p <- p + ggplot2::scale_shape_manual(
         values = shape_map,
         limits = names(shape_map),
@@ -237,128 +285,374 @@ plot.icers <- function(
     # ----------------------------------------------------------------------
     # 6.2 Axes
     # ----------------------------------------------------------------------
+
     p <- p +
       ggplot2::geom_hline(
-        yintercept = 0, colour = "grey70", linetype = "dashed"
+        yintercept = 0,
+        colour = "grey70",
+        linetype = "dashed"
       ) +
       ggplot2::geom_vline(
-        xintercept = 0, colour = "grey70", linetype = "dashed"
+        xintercept = 0,
+        colour = "grey70",
+        linetype = "dashed"
       )
 
     # ----------------------------------------------------------------------
     # 6.3 Legend cleanup
     # ----------------------------------------------------------------------
-    if (valid_color && dplyr::n_distinct(plot_df[[color_var]]) == 1L) {
+
+    if (valid_color &&
+        dplyr::n_distinct(plot_df[[color_var]]) == 1L) {
+
       p <- p + ggplot2::guides(colour = "none")
     }
-    if (valid_shape && dplyr::n_distinct(plot_df[[shape_var]]) == 1L) {
+
+    if (valid_shape &&
+        dplyr::n_distinct(plot_df[[shape_var]]) == 1L) {
+
       p <- p + ggplot2::guides(shape = "none")
     }
 
     # ----------------------------------------------------------------------
-    # 6.4 Bootstrap clouds
+    # 6.4 Bootstrap and PSA clouds
     # ----------------------------------------------------------------------
+
     if (show_points) {
+
       usr <- list(...)
+
       n_rep <- dplyr::n_distinct(plot_df$replicate)
-      alpha_auto <- min(0.9, max(0.3, 0.9 - 0.25 * log10(n_rep / 100)))
+
+      alpha_auto <- min(
+        0.9,
+        max(0.3, 0.9 - 0.25 * log10(n_rep / 100))
+      )
+
       alpha_val <- usr$alpha %||% alpha_auto
-      size_val  <- usr$size  %||% 1.2
+      size_val  <- usr$size %||% 1.2
 
-      aes_cloud <- ggplot2::aes(x = Delta_Effect, y = Delta_Cost)
-      if (valid_color) aes_cloud$colour <- rlang::sym(color_var)
-      if (valid_shape) aes_cloud$shape <- rlang::sym(shape_var)
+      aes_cloud <- ggplot2::aes(
+        x = Delta_Effect,
+        y = Delta_Cost
+      )
 
-      p <- p + ggplot2::geom_point(
+      if (valid_color) {
+        aes_cloud$colour <- rlang::sym(color_var)
+      }
+
+      if (valid_shape) {
+        aes_cloud$shape <- rlang::sym(shape_var)
+      }
+
+      point_args <- list(
         data = plot_df,
         mapping = aes_cloud,
         alpha = alpha_val,
         size = size_val,
         show.legend = TRUE
       )
+
+      if (!valid_color) {
+        point_args$colour <- unname(color_map[[1]])
+      }
+
+      p <- p + do.call(
+        ggplot2::geom_point,
+        point_args
+      )
     }
 
     # ----------------------------------------------------------------------
     # 6.5 Confidence contours
     # ----------------------------------------------------------------------
+
     if (show_contours) {
+
       selected_contour_type <- match.arg(
-        contour_type, c("non_parametric", "ellipse")
+        contour_type,
+        c("non_parametric", "ellipse")
       )
-      selected_contour_levels <- pmin(pmax(contour_level, 0.001), 0.999)
+
+      selected_contour_levels <- pmin(
+        pmax(contour_level, 0.001),
+        0.999
+      )
+
+      contour_legend <- !show_points && !show_means
+
+      if (valid_shape) {
+
+        p <- p + ggplot2::scale_linetype_manual(
+          name = shape_var,
+          values = linetype_vals,
+          limits = names(linetype_vals),
+          drop = FALSE
+        )
+
+        if (!show_points && !show_means) {
+
+          p <- p + ggplot2::guides(
+            shape = "none",
+            linetype = ggplot2::guide_legend(
+              title = shape_var
+            )
+          )
+        }
+      }
 
       for (gid in unique(plot_df$group_uid)) {
-        sub <- plot_df[plot_df$group_uid == gid, , drop = FALSE]
+
+        sub <- plot_df[
+          plot_df$group_uid == gid,
+          ,
+          drop = FALSE
+        ]
+
         if (nrow(sub) < 30L) next
 
-        color_key <- if (valid_color) {
-          as.character(unique(sub[[color_var]])[1])
-        } else {
-          "fixed"
-        }
-        col_ct <- colorspace::darken(color_map[[color_key]], 0.55)
+        # Preserve analytical identifiers for faceting.
+        # computed_by is included when available so that contours
+        # are drawn only in their corresponding simulation panel.
 
-        if (valid_shape) {
-          shape_key <- as.character(unique(sub[[shape_var]])[1])
-          lt_ct <- linetype_vals[shape_key]
-        } else {
-          lt_ct <- "solid"
+        facet_columns <- c(
+          "dataset",
+          "subgroup_var",
+          "subgroup_level",
+          "comparison",
+          "group_uid"
+        )
+
+        if ("computed_by" %in% names(sub)) {
+          facet_columns <- c(
+            facet_columns,
+            "computed_by"
+          )
         }
+
+        facet_info <- sub[
+          1,
+          facet_columns,
+          drop = FALSE
+        ]
+
+        aes_contour <- ggplot2::aes(
+          x = Delta_Effect,
+          y = Delta_Cost,
+          group = group_uid
+        )
+
+
+        # ------------------------------------------------------------------
+        # Contour aesthetics: darker colours than replicate clouds
+        # ------------------------------------------------------------------
+
+        # Resolve the original colour assigned to this analytical group.
+        if (valid_color) {
+
+          contour_base_colour <- unname(
+            color_map[as.character(sub[[color_var]][1])]
+          )
+
+        } else {
+
+          contour_base_colour <- unname(color_map[[1]])
+        }
+
+        # Apply the same 30% darkening used for mean points.
+        contour_colour <- colorspace::darken(
+          contour_base_colour,
+          amount = 0.30
+        )
+
+        # Preserve the original linetype mapping.
+        if (valid_shape) {
+          aes_contour$linetype <- rlang::sym(shape_var)
+        }
+
+        # Common arguments for elliptical and non-parametric contours.
+        contour_args <- list(
+          mapping = aes_contour,
+          colour = contour_colour,
+          linewidth = 0.6,
+          inherit.aes = FALSE,
+          show.legend = contour_legend
+        )
+
+        if (!valid_shape) {
+          contour_args$linetype <- "solid"
+        }
+
+
+        # ------------------------------------------------------------------
+        # Non-parametric confidence contours
+        # ------------------------------------------------------------------
 
         if (selected_contour_type == "non_parametric") {
-          dens <- MASS::kde2d(sub$Delta_Effect, sub$Delta_Cost, n = 200)
+
+          # NEW:
+          # A bivariate kernel density requires variability in both
+          # incremental effectiveness and incremental cost.
+          #
+          # Degenerate PSA distributions may have constant costs.
+          # Such groups cannot support a conventional 2D KDE contour.
+          #
+          # The original data and plotted points remain unchanged.
+
+          x_vals <- sub$Delta_Effect
+          y_vals <- sub$Delta_Cost
+
+          valid_xy <- is.finite(x_vals) & is.finite(y_vals)
+
+          x_vals <- x_vals[valid_xy]
+          y_vals <- y_vals[valid_xy]
+
+          if (length(x_vals) < 30L) next
+
+          # Check for sufficient variability in both dimensions.
+
+          sd_x <- stats::sd(x_vals)
+          sd_y <- stats::sd(y_vals)
+
+          if (
+            !is.finite(sd_x) ||
+            !is.finite(sd_y) ||
+            sd_x <= 0 ||
+            sd_y <= 0
+          ) {
+            next
+          }
+
+          # Estimate the bivariate density safely.
+          # A numerical failure affects only the current group.
+
+          dens <- tryCatch(
+            MASS::kde2d(
+              x_vals,
+              y_vals,
+              n = 200
+            ),
+            error = function(e) NULL
+          )
+
+          if (is.null(dens)) next
+
           grid <- expand.grid(
             Delta_Effect = dens$x,
             Delta_Cost = dens$y
           )
+
           grid$z <- as.vector(dens$z)
+
+          # Preserve faceting and aesthetic variables.
+
+          extra_vars <- unique(c(
+            names(facet_info),
+            color_var,
+            shape_var
+          ))
+
+          for (nm in extra_vars) {
+            grid[[nm]] <- sub[[nm]][1]
+          }
+
           dx <- diff(dens$x)[1]
           dy <- diff(dens$y)[1]
-          z_sorted <- sort(grid$z, decreasing = TRUE)
+
+          # Additional numerical safeguards.
+
+          if (
+            !is.finite(dx) ||
+            !is.finite(dy) ||
+            dx <= 0 ||
+            dy <= 0
+          ) {
+            next
+          }
+
+          z_sorted <- sort(
+            grid$z[is.finite(grid$z)],
+            decreasing = TRUE
+          )
+
+          if (length(z_sorted) == 0L) next
+
           cum_vol <- cumsum(z_sorted) * dx * dy
 
           for (lvl in selected_contour_levels) {
+
             idx <- which(cum_vol >= lvl)[1]
+
+            if (is.na(idx)) next
+
             threshold <- z_sorted[idx]
-            p <- p + ggplot2::geom_contour(
-              data = grid,
-              mapping = ggplot2::aes(
-                x = Delta_Effect, y = Delta_Cost, z = z
-              ),
-              breaks = threshold,
-              colour = col_ct,
-              linetype = lt_ct,
-              linewidth = 0.6,
-              inherit.aes = FALSE,
-              show.legend = FALSE
+
+            if (!is.finite(threshold)) next
+
+            contour_mapping <- aes_contour
+            contour_mapping$z <- rlang::sym("z")
+
+            args <- contour_args
+            args$data <- grid
+            args$mapping <- contour_mapping
+            args$breaks <- threshold
+
+            p <- p + do.call(
+              ggplot2::geom_contour,
+              args
             )
           }
+
         } else {
+
+          # ----------------------------------------------------------------
+          # Parametric elliptical confidence contours
+          # ----------------------------------------------------------------
+
           mu <- colMeans(
-            sub[, c("Delta_Effect", "Delta_Cost")], na.rm = TRUE
+            sub[, c("Delta_Effect", "Delta_Cost")],
+            na.rm = TRUE
           )
+
           cv <- stats::cov(
             sub[, c("Delta_Effect", "Delta_Cost")],
             use = "pairwise"
           )
+
           eg <- eigen(cv)
 
           for (lvl in selected_contour_levels) {
+
             chi <- sqrt(stats::qchisq(lvl, df = 2))
             t <- seq(0, 2 * pi, length.out = 200)
-            xy <- t(mu + eg$vectors %*%
-                      (sqrt(eg$values) * chi * rbind(cos(t), sin(t))))
-            p <- p + ggplot2::geom_path(
-              data = data.frame(
-                Delta_Effect = xy[, 1],
-                Delta_Cost = xy[, 2]
-              ),
-              mapping = ggplot2::aes(Delta_Effect, Delta_Cost),
-              colour = col_ct,
-              linetype = lt_ct,
-              linewidth = 0.6,
-              inherit.aes = FALSE,
-              show.legend = FALSE
+
+            xy <- t(
+              mu + eg$vectors %*%
+                (sqrt(eg$values) * chi *
+                   rbind(cos(t), sin(t)))
+            )
+
+            ellipse_df <- data.frame(
+              Delta_Effect = xy[, 1],
+              Delta_Cost = xy[, 2]
+            )
+
+            extra_vars <- unique(c(
+              names(facet_info),
+              color_var,
+              shape_var
+            ))
+
+            for (nm in extra_vars) {
+              ellipse_df[[nm]] <- sub[[nm]][1]
+            }
+
+            args <- contour_args
+            args$data <- ellipse_df
+
+            p <- p + do.call(
+              ggplot2::geom_path,
+              args
             )
           }
         }
@@ -368,46 +662,147 @@ plot.icers <- function(
     # ----------------------------------------------------------------------
     # 6.6 Mean points
     # ----------------------------------------------------------------------
+
     if (show_means) {
+
+      # Preserve the simulation method when present.
+      # This allows bootstrap and PSA means to be represented separately.
+
+      mean_group_vars <- c(
+        "dataset",
+        "subgroup_var",
+        "subgroup_level",
+        "comparison",
+        "group_uid"
+      )
+
+      if ("computed_by" %in% names(plot_df)) {
+        mean_group_vars <- c(
+          mean_group_vars,
+          "computed_by"
+        )
+      }
+
       means <- plot_df %>%
         dplyr::group_by(
-          dataset, subgroup_var, subgroup_level, comparison, group_uid
+          dplyr::across(
+            dplyr::all_of(mean_group_vars)
+          )
         ) %>%
         dplyr::summarise(
           Delta_Effect = mean(Delta_Effect, na.rm = TRUE),
           Delta_Cost = mean(Delta_Cost, na.rm = TRUE),
-          colour_key = if (valid_color) dplyr::first(.data[[color_var]])
-          else "fixed",
-          shape_key = if (valid_shape) dplyr::first(.data[[shape_var]])
-          else "fixed",
           .groups = "drop"
         )
 
-      means$fill_col <- unname(color_map[as.character(means$colour_key)])
-      means$border_col <- colorspace::darken(means$fill_col, 0.55)
+      # Resolve original colours from the global palette.
+
+      if (valid_color) {
+
+        means$colour_key <- as.character(means[[color_var]])
+
+        means$base_colour <- unname(
+          color_map[means$colour_key]
+        )
+
+      } else {
+
+        means$colour_key <- "fixed"
+
+        means$base_colour <- rep(
+          unname(color_map[[1]]),
+          nrow(means)
+        )
+      }
+
+      # Preserve the original darker mean symbols.
+
+      means$mean_colour <- colorspace::darken(
+        means$base_colour,
+        amount = 0.30
+      )
+
+      # Preserve original shape assignments.
+
+      if (valid_shape) {
+
+        means$point_shape <- unname(
+          shape_map[
+            as.character(means[[shape_var]])
+          ]
+        )
+
+      } else {
+
+        means$point_shape <- rep(
+          16,
+          nrow(means)
+        )
+      }
+
+      # Map per-row colours and shapes safely.
+
+      aes_mean <- ggplot2::aes(
+        x = Delta_Effect,
+        y = Delta_Cost,
+        group = group_uid,
+        colour = I(mean_colour),
+        shape = I(point_shape)
+      )
 
       p <- p + ggplot2::geom_point(
         data = means,
-        mapping = ggplot2::aes(
-          x = Delta_Effect,
-          y = Delta_Cost,
-          shape = shape_key,
-          group = group_uid
-        ),
-        fill = means$fill_col,
-        colour = means$border_col,
+        mapping = aes_mean,
         size = 2.5,
-        stroke = 1,
         inherit.aes = FALSE,
         show.legend = FALSE
       )
+
+      # Preserve legends when replicate clouds are hidden.
+
+      if (!show_points && (valid_color || valid_shape)) {
+
+        aes_legend <- ggplot2::aes(
+          x = Delta_Effect,
+          y = Delta_Cost
+        )
+
+        if (valid_color) {
+          aes_legend$colour <- rlang::sym(color_var)
+        }
+
+        if (valid_shape) {
+          aes_legend$shape <- rlang::sym(shape_var)
+        }
+
+        p <- p + ggplot2::geom_point(
+          data = means,
+          mapping = aes_legend,
+          alpha = 0,
+          size = 3.5,
+          inherit.aes = FALSE,
+          show.legend = TRUE
+        )
+
+        p <- p + ggplot2::guides(
+          colour = ggplot2::guide_legend(
+            override.aes = list(alpha = 1)
+          ),
+          shape = ggplot2::guide_legend(
+            override.aes = list(alpha = 1)
+          )
+        )
+      }
     }
 
     # ----------------------------------------------------------------------
     # 6.7 WTP lambda lines
     # ----------------------------------------------------------------------
+
     if (show_lambdas && !is.null(lambda_vals)) {
+
       for (l in lambda_vals) {
+
         p <- p + ggplot2::geom_abline(
           slope = l,
           intercept = 0,
@@ -418,15 +813,28 @@ plot.icers <- function(
       }
 
       if (label_lambdas) {
-        max_x <- max(plot_df$Delta_Effect, na.rm = TRUE)
+
+        max_x <- max(
+          plot_df$Delta_Effect,
+          na.rm = TRUE
+        )
+
         df_lab <- data.frame(
           x = max_x * 0.85,
           y = lambda_vals * max_x,
-          label = paste0("lambda = ", lambda_vals)
+          label = paste0(
+            "lambda = ",
+            lambda_vals
+          )
         )
+
         p <- p + ggplot2::geom_text(
           data = df_lab,
-          mapping = ggplot2::aes(x = x, y = y, label = label),
+          mapping = ggplot2::aes(
+            x = x,
+            y = y,
+            label = label
+          ),
           colour = "grey30",
           size = 3,
           hjust = 0,
@@ -439,9 +847,15 @@ plot.icers <- function(
     # ----------------------------------------------------------------------
     # 6.8 Labels
     # ----------------------------------------------------------------------
+
     subtitle <- NULL
+
     if (!is.null(plot_label)) {
-      subtitle <- paste0(resolved_plot, ": ", plot_label)
+      subtitle <- paste0(
+        resolved_plot,
+        ": ",
+        plot_label
+      )
     }
 
     p <- p + ggplot2::labs(
@@ -457,22 +871,36 @@ plot.icers <- function(
   # ========================================================================
   # 7. Return one plot or independently constructed plots
   # ========================================================================
+
   if (is.null(resolved_plot)) {
     return(build_plot(df))
   }
 
-  output <- vector("list", length(plot_levels))
+  output <- vector(
+    "list",
+    length(plot_levels)
+  )
+
   names(output) <- plot_levels
 
   for (i in seq_along(plot_levels)) {
+
     level <- plot_levels[[i]]
+
     plot_df <- df[
       as.character(df[[resolved_plot]]) == level,
       ,
       drop = FALSE
     ]
-    output[[i]] <- build_plot(plot_df, plot_label = level)
+
+    output[[i]] <- build_plot(
+      plot_df,
+      plot_label = level
+    )
   }
 
-  cea_multplots_handler(output, plot_type = "ICER plane")
+  cea_multplots_handler(
+    output,
+    plot_type = "ICER plane"
+  )
 }

@@ -1,3 +1,4 @@
+
 #' Internal Graphical Layout Engine for CEAgroupR Visualizations
 #'
 #' Internal utility function that constructs the base \code{ggplot2} object
@@ -108,6 +109,7 @@ ce_plot_base <- function(
 
   if (!exists_var(color_by)) color_by <- NULL
   if (!exists_var(shape_by)) shape_by <- NULL
+
   if (!is.null(plot_by) && !exists_var(plot_by)) {
     stop(
       "'plot_by' must be 'none', NULL, or the name of an existing column in 'data'.",
@@ -183,7 +185,8 @@ ce_plot_base <- function(
 
     } else if (facet_by %in% c(
       "dataset", "comparison",
-      "subgroup_var", "subgroup_level"
+      "subgroup_var", "subgroup_level",
+      "computed_by"  # NEW: distinguish bootstrap and PSA
     )) {
 
       p <- p +
