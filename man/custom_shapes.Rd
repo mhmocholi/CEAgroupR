@@ -45,11 +45,11 @@ my_shapes <- custom_shapes(
 
 ## Use custom shapes in an ICER plane
 res <- compute_icers(
-  data      = cua_base,
+  data      = cua_example,
   group     = "group",
   cost      = "cost_total",
   effect    = "effect",
-  ref_group = "g0",
+  ref_group = "usual_care",
   R         = 50,
   seed      = 123
 )

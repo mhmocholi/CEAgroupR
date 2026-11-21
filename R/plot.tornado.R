@@ -1,3 +1,4 @@
+
 #' Plot One-Way Sensitivity Analysis Tornado Diagrams
 #'
 #' Produces tornado diagrams from deterministic one-way sensitivity
@@ -6,7 +7,7 @@
 #' Supports multiple datasets, comparisons, subgroups, willingness-to-pay
 #' thresholds, and independent plots using plot_by.
 #'
-#' @param data An object of class "owsa_result".
+#' @param x An object of class "owsa_result".
 #' @param metric Economic outcome to represent. One of:
 #'   \itemize{
 #'     \item \code{"icer"}: incremental cost-effectiveness ratio.
@@ -37,6 +38,7 @@
 #' @param shapes_palette Optional object of class "cea_shapes".
 #' @param alpha Bar fill opacity, between 0 and 1.
 #' @param return_data Return plotting data instead of graphs.
+#' @param ... Additional arguments reserved for S3 compatibility.
 #'
 #' @details
 #' In relative mode, scenario values are represented as changes
@@ -68,7 +70,7 @@
 #' @export
 #' @rawNamespace export(plot.tornado)
 plot.tornado <- function(
-    data,
+    x,
     metric = "nmb",
     lambda = NULL,
     impact_mode = NULL,
@@ -84,8 +86,13 @@ plot.tornado <- function(
     ),
     shapes_palette = NULL,
     alpha = 0.40,
-    return_data = FALSE
+    return_data = FALSE,
+    ...
 ) {
+
+  # Standard S3 plot(x, ...) interface.
+  # Preserve the existing internal implementation.
+  data <- x
 
   `%||%` <- function(a, b) {
     if (!is.null(a)) a else b

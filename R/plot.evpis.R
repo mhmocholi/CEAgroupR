@@ -28,7 +28,7 @@
 #'
 #' @details
 #' This function relies on the internal plotting engine
-#' \code{\link{ce_plot_base}} to ensure consistent aesthetics and behaviour
+#' \code{ce_plot_base()} to ensure consistent aesthetics and behaviour
 #' across CEAgroupR visualizations.
 #'
 #' The EVPI is computed separately for each comparison using incremental
@@ -46,15 +46,14 @@
 #' or a tidy data frame containing EVPI values when
 #' \code{return_data = TRUE}.
 #'
-
 #' @examples
 #' ## Example 1: EVPI curve for a single dataset
 #' res <- compute_icers(
-#'   data      = cua_base,
+#'   data      = cua_example,
 #'   group     = "group",
 #'   cost      = "cost_total",
 #'   effect    = "effect",
-#'   ref_group = "g0",
+#'   ref_group = "usual_care",
 #'   R         = 50,
 #'   seed      = 123
 #' )
@@ -63,11 +62,11 @@
 #'
 #' ## Example 2: EVPI with subgroup stratification
 #' res_subgroups <- compute_icers(
-#'   data          = cua_base,
+#'   data          = cua_example,
 #'   group         = "group",
 #'   cost          = "cost_total",
 #'   effect        = "effect",
-#'   ref_group     = "g0",
+#'   ref_group     = "usual_care",
 #'   subgroup_vars = "diabetes",
 #'   R             = 50,
 #'   seed          = 123
@@ -88,7 +87,7 @@
 #' @export
 #' @rawNamespace export(plot.evpis)
 plot.evpis <- function(
-    data,
+    x,
     color_by       = NULL,
     shape_by       = NULL,
     facet_by       = NULL,
@@ -103,6 +102,10 @@ plot.evpis <- function(
     return_data    = FALSE,
     ...
 ) {
+
+  # Preserve the existing internal implementation while
+  # using the standard S3 plot(x, ...) interface.
+  data <- x
 
   `%||%` <- function(a, b) if (!is.null(a)) a else b
 
@@ -383,7 +386,6 @@ plot.evpis <- function(
 
     if (!is.null(color_var))
       aes_act$colour <- rlang::sym(color_var)
-
 
     p <- p +
       ggplot2::geom_point(

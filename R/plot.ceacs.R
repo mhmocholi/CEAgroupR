@@ -48,7 +48,7 @@
 #'
 #' @details
 #' This function relies on the internal plotting engine
-#' \code{\link{ce_plot_base}} to ensure consistent aesthetics and behaviour
+#' \code{ce_plot_base()} to ensure consistent aesthetics and behaviour
 #' across all CEAgroupR visualizations.
 #'
 #' When \code{plot_by} is specified, the CEAC data are calculated globally
@@ -67,11 +67,11 @@
 #' @examples
 #' ## Example 1: Basic CEAC for a single dataset
 #' res <- compute_icers(
-#'   data      = cua_base,
+#'   data      = cua_example,
 #'   group     = "group",
 #'   cost      = "cost_total",
 #'   effect    = "effect",
-#'   ref_group = "g0",
+#'   ref_group = "usual_care",
 #'   R         = 50,
 #'   seed      = 123
 #' )
@@ -80,11 +80,11 @@
 #'
 #' ## Example 2: CEAC with subgroup stratification
 #' res_subgroups <- compute_icers(
-#'   data          = cua_base,
+#'   data          = cua_example,
 #'   group         = "group",
 #'   cost          = "cost_total",
 #'   effect        = "effect",
-#'   ref_group     = "g0",
+#'   ref_group     = "usual_care",
 #'   subgroup_vars = "diabetes",
 #'   R             = 50,
 #'   seed          = 123
@@ -108,7 +108,7 @@
 #' @rawNamespace export(plot.ceacs)
 
 plot.ceacs <- function(
-    data,
+    x,
     color_by = NULL,
     shape_by = NULL,
     facet_by = NULL,
@@ -126,6 +126,10 @@ plot.ceacs <- function(
     return_data = FALSE,
     ...
 ) {
+
+  # Preserve the internal data variable while using
+  # the standard S3 plot(x, ...) interface.
+  data <- x
 
   `%||%` <- function(a, b) if (!is.null(a)) a else b
 

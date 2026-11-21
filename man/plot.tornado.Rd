@@ -5,7 +5,7 @@
 \title{Plot One-Way Sensitivity Analysis Tornado Diagrams}
 \usage{
 \method{plot}{tornado}(
-  data,
+  x,
   metric = "nmb",
   lambda = NULL,
   impact_mode = NULL,
@@ -18,11 +18,12 @@
   palette = c(lower = "#4472C4", upper = "#C0504D"),
   shapes_palette = NULL,
   alpha = 0.4,
-  return_data = FALSE
+  return_data = FALSE,
+  ...
 )
 }
 \arguments{
-\item{data}{An object of class "owsa_result".}
+\item{x}{An object of class "owsa_result".}
 
 \item{metric}{Economic outcome to represent. One of:
 \itemize{
@@ -65,6 +66,8 @@ or "subgroup_level". NULL defaults to "comparison".}
 \item{alpha}{Bar fill opacity, between 0 and 1.}
 
 \item{return_data}{Return plotting data instead of graphs.}
+
+\item{...}{Additional arguments reserved for S3 compatibility.}
 }
 \value{
 A ggplot object, a data frame, or a named list of either.

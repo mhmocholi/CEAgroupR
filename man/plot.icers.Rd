@@ -5,7 +5,7 @@
 \title{Plot Incremental Cost-Effectiveness (ICER) Plane}
 \usage{
 \method{plot}{icers}(
-  data,
+  x,
   color_by = NULL,
   shape_by = NULL,
   facet_by = NULL,
@@ -26,7 +26,7 @@
 )
 }
 \arguments{
-\item{data}{Either the output of \code{\link{compute_icers}} or a tibble
+\item{x}{Either the output of \code{\link{compute_icers}} or a tibble
 produced by \code{\link{combine_icers_results}}.}
 
 \item{color_by}{Variable used for colour mapping. \code{NULL} defaults to
@@ -95,11 +95,11 @@ This does not affect the underlying observations or mean estimates.
 }
 \examples{
 res <- compute_icers(
-  data = cua_base,
+  data = cua_example,
   group = "group",
   cost = "cost_total",
   effect = "effect",
-  ref_group = "g0",
+  ref_group = "usual_care",
   R = 50,
   seed = 123
 )

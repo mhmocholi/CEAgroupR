@@ -45,16 +45,16 @@ comparison from a \code{cea_results} object.
 \examples{
 ## Example: Inspect a single comparison with higher precision
 res <- compute_icers(
-  data      = cua_base,
+  data      = cua_example,
   group     = "group",
   cost      = "cost_total",
   effect    = "effect",
-  ref_group = "g0",
+  ref_group = "usual_care",
   R         = 50,
   seed      = 123
 )
 
 ## Extract and print one comparison
-print(res[[1]][["g1"]], digits = 4)
+print(res[[1]][["exercise_A"]], digits = 4)
 
 }

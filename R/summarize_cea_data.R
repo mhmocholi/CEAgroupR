@@ -71,20 +71,23 @@
 #' @examples
 #' ## Example 1: Descriptive summary for a single dataset
 #' summary_base <- summarize_cea_data(
-#'   data      = cua_base,
+#'   data      = cua_example,
 #'   group     = "group",
 #'   cost      = "cost_total",
 #'   effect    = "effect",
-#'   ref_group = "g0",
+#'   ref_group = "usual_care",
 #'   lambda    = c(20000, 30000)
 #' )
 #'
 #' head(summary_base)
 #'
 #' ## Example 2: Multi-dataset summary with subgroup stratification
+#' scenario_alt <- cua_example
+#' scenario_alt$cost_total <- scenario_alt$cost_total * 1.10
+#'
 #' data_list <- list(
-#'   base_case        = cua_multi,
-#'   discounted_case = cua_multi_discounted
+#'   base_case            = cua_example,
+#'   alternative_scenario = scenario_alt
 #' )
 #'
 #' summary_multi <- summarize_cea_data(

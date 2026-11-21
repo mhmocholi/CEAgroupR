@@ -1,4 +1,3 @@
-
 #' Plot Incremental Cost-Effectiveness (ICER) Plane
 #'
 #' Produces the incremental cost-effectiveness (CE) plane based on bootstrap
@@ -8,7 +7,7 @@
 #' Supports multi-strategy and multi-dataset analyses, subgroup stratification,
 #' flexible aesthetic mappings, and independent plots through \code{plot_by}.
 #'
-#' @param data Either the output of \code{\link{compute_icers}} or a tibble
+#' @param x Either the output of \code{\link{compute_icers}} or a tibble
 #'   produced by \code{\link{combine_icers_results}}.
 #' @param color_by Variable used for colour mapping. \code{NULL} defaults to
 #'   \code{"comparison"}; \code{"none"} disables mapping.
@@ -51,11 +50,11 @@
 #'
 #' @examples
 #' res <- compute_icers(
-#'   data = cua_base,
+#'   data = cua_example,
 #'   group = "group",
 #'   cost = "cost_total",
 #'   effect = "effect",
-#'   ref_group = "g0",
+#'   ref_group = "usual_care",
 #'   R = 50,
 #'   seed = 123
 #' )
@@ -67,7 +66,7 @@
 #' @rawNamespace export(plot.icers)
 
 plot.icers <- function(
-    data,
+    x,
     color_by       = NULL,
     shape_by       = NULL,
     facet_by       = NULL,
@@ -86,6 +85,8 @@ plot.icers <- function(
     shapes_palette = NULL,
     ...
 ) {
+  data <- x
+
 
   `%||%` <- function(a, b) if (!is.null(a)) a else b
 

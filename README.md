@@ -43,17 +43,26 @@ devtools::load_all()
 
 # Quick example
 
-Below is a minimal example using the bundled datasets `cua_multi` and
-`cua_multi_discounted`.
+Below is a minimal cost-effectiveness analysis using the bundled
+`cua_example` dataset.
+
+The example compares a base-case scenario with an alternative scenario
+in which total costs are increased by 10%.
 
 ```r
 library(CEAgroupR)
 
+# Create an alternative scenario
+scenario_alt <- cua_example
+scenario_alt$cost_total <- scenario_alt$cost_total * 1.10
+
+# Define the datasets
 data_list <- list(
-  Base       = cua_multi,
-  Discounted = cua_multi_discounted
+  Base        = cua_example,
+  Alternative = scenario_alt
 )
 
+# Run the cost-effectiveness analysis
 res <- compute_icers(
   data          = data_list,
   group         = "group",
@@ -71,6 +80,8 @@ Summary statistics:
 ```r
 res$summary_stats
 ```
+
+---
 
 ---
 

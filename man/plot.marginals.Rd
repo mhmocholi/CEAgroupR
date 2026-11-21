@@ -5,7 +5,7 @@
 \title{Plot Marginal Distributions of Incremental Outcomes}
 \usage{
 \method{plot}{marginals}(
-  data,
+  x,
   variable = "cost",
   geom_type = "histogram",
   color_by = NULL,
@@ -22,7 +22,7 @@
 )
 }
 \arguments{
-\item{data}{Either the output of \code{\link{compute_icers}} or a tibble
+\item{x}{Either the output of \code{\link{compute_icers}} or a tibble
 produced by \code{\link{combine_icers_results}}.}
 
 \item{variable}{Character string specifying which marginal distribution
@@ -102,11 +102,11 @@ The \code{shape_by} argument controls line type rather than point shape.
 \examples{
 ## Example 1: Marginal distribution of incremental costs
 res <- compute_icers(
-  data      = cua_base,
+  data      = cua_example,
   group     = "group",
   cost      = "cost_total",
   effect    = "effect",
-  ref_group = "g0",
+  ref_group = "usual_care",
   R         = 50,
   seed      = 123
 )

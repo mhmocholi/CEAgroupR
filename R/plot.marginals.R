@@ -49,15 +49,14 @@
 #' selected incremental outcome, or a \code{cea_multplots} object when
 #' \code{plot_by} is specified.
 #'
-
 #' @examples
 #' ## Example 1: Marginal distribution of incremental costs
 #' res <- compute_icers(
-#'   data      = cua_base,
+#'   data      = cua_example,
 #'   group     = "group",
 #'   cost      = "cost_total",
 #'   effect    = "effect",
-#'   ref_group = "g0",
+#'   ref_group = "usual_care",
 #'   R         = 50,
 #'   seed      = 123
 #' )
@@ -90,7 +89,7 @@
 #' @export
 #' @rawNamespace export(plot.marginals)
 plot.marginals <- function(
-    data,
+    x,
     variable       = "cost",
     geom_type      = "histogram",
     color_by       = NULL,
@@ -105,6 +104,10 @@ plot.marginals <- function(
     bins           = 30,
     ...
 ) {
+
+  # Preserve the existing internal implementation while
+  # using the standard S3 plot(x, ...) interface.
+  data <- x
 
   `%||%` <- function(a, b) if (!is.null(a)) a else b
   alpha_fill <- function(cols) scales::alpha(cols, 0.5)

@@ -10,7 +10,7 @@
 #' preparation, economic outcomes, colour scales, grouping
 #' logic and panel validation.
 #'
-#' @param data An object of class "twsa_result".
+#' @param x An object of class "twsa_result".
 #' @param type Graphical representation: "heatmap" or "contour".
 #' @param metric Economic outcome: "nmb", "icer",
 #'   "delta_cost" or "delta_effect".
@@ -34,6 +34,7 @@
 #' @param n_contours Number of contour intervals.
 #' @param show_boundary Highlight the NMB = 0 decision boundary.
 #' @param return_data Return prepared plotting data.
+#' @param ... Additional arguments reserved for S3 compatibility.
 #'
 #' @details
 #' The heatmap representation uses categorical scenario axes
@@ -50,8 +51,9 @@
 #' baseline-baseline combination within each analytical series.
 #'
 #' The NMB = 0 decision boundary is available only for
-#' absolute NMB. It represents economic indifference between
-#' the intervention and its comparator at the selected WTP.
+#' absolute NMB on numerical plotting surfaces. It represents
+#' economic indifference between the intervention and its
+#' comparator at the selected WTP.
 #'
 #' @return A ggplot object, a cea_multplots collection,
 #'   or prepared plotting data.
@@ -59,7 +61,7 @@
 #' @export
 #' @rawNamespace export(plot.twsa)
 plot.twsa <- function(
-    data,
+    x,
     type = "heatmap",
     metric = "nmb",
     lambda = NULL,
@@ -79,8 +81,13 @@ plot.twsa <- function(
     digits = 2,
     n_contours = 12L,
     show_boundary = TRUE,
-    return_data = FALSE
+    return_data = FALSE,
+    ...
 ) {
+
+  # Standard S3 plot(x, ...) interface.
+  # Preserve the existing internal implementation.
+  data <- x
 
   `%||%` <- function(a, b) {
     if (!is.null(a)) a else b
@@ -1177,11 +1184,9 @@ plot.twsa <- function(
 
       boundary_data <- plot_df
 
-      # Categorical heatmaps use numerical coordinates for
-      # the decision boundary while preserving categorical axes.
-      #
-      # Numerical contour geometry is therefore available
-      # directly for contour and dense heatmap representations.
+      # Categorical heatmaps use categorical axes.
+      # The numerical decision boundary is available
+      # for contour and dense heatmap representations.
 
       if (!categorical_heatmap) {
 

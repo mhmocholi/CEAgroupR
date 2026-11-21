@@ -5,7 +5,7 @@
 \title{Plot Two-Way Sensitivity Analysis}
 \usage{
 \method{plot}{twsa}(
-  data,
+  x,
   type = "heatmap",
   metric = "nmb",
   lambda = NULL,
@@ -22,11 +22,12 @@
   digits = 2,
   n_contours = 12L,
   show_boundary = TRUE,
-  return_data = FALSE
+  return_data = FALSE,
+  ...
 )
 }
 \arguments{
-\item{data}{An object of class "twsa_result".}
+\item{x}{An object of class "twsa_result".}
 
 \item{type}{Graphical representation: "heatmap" or "contour".}
 
@@ -67,6 +68,8 @@ NULL enables values automatically for three-level heatmaps.}
 \item{show_boundary}{Highlight the NMB = 0 decision boundary.}
 
 \item{return_data}{Return prepared plotting data.}
+
+\item{...}{Additional arguments reserved for S3 compatibility.}
 }
 \value{
 A ggplot object, a cea_multplots collection,
@@ -96,6 +99,7 @@ Relative impacts are calculated against the corresponding
 baseline-baseline combination within each analytical series.
 
 The NMB = 0 decision boundary is available only for
-absolute NMB. It represents economic indifference between
-the intervention and its comparator at the selected WTP.
+absolute NMB on numerical plotting surfaces. It represents
+economic indifference between the intervention and its
+comparator at the selected WTP.
 }

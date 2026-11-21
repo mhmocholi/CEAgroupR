@@ -5,7 +5,7 @@
 \title{Plot Expected Value of Perfect Information (EVPI)}
 \usage{
 \method{plot}{evpis}(
-  data,
+  x,
   color_by = NULL,
   shape_by = NULL,
   facet_by = NULL,
@@ -22,7 +22,7 @@
 )
 }
 \arguments{
-\item{data}{Either the output of \code{\link{compute_icers}} or a tibble
+\item{x}{Either the output of \code{\link{compute_icers}} or a tibble
 produced by \code{\link{combine_icers_results}}.}
 
 \item{color_by}{Variable used for colour mapping. \code{NULL} defaults to
@@ -86,7 +86,7 @@ research. The function supports multi-strategy and multi-dataset analyses,
 explicit subgroup stratification, and flexible aesthetic mappings.
 
 This function relies on the internal plotting engine
-\code{\link{ce_plot_base}} to ensure consistent aesthetics and behaviour
+\code{ce_plot_base()} to ensure consistent aesthetics and behaviour
 across CEAgroupR visualizations.
 
 The EVPI is computed separately for each comparison using incremental
@@ -101,11 +101,11 @@ The \code{shape_by} argument controls line type rather than point shape.
 \examples{
 ## Example 1: EVPI curve for a single dataset
 res <- compute_icers(
-  data      = cua_base,
+  data      = cua_example,
   group     = "group",
   cost      = "cost_total",
   effect    = "effect",
-  ref_group = "g0",
+  ref_group = "usual_care",
   R         = 50,
   seed      = 123
 )
@@ -114,11 +114,11 @@ plot.evpis(res)
 
 ## Example 2: EVPI with subgroup stratification
 res_subgroups <- compute_icers(
-  data          = cua_base,
+  data          = cua_example,
   group         = "group",
   cost          = "cost_total",
   effect        = "effect",
-  ref_group     = "g0",
+  ref_group     = "usual_care",
   subgroup_vars = "diabetes",
   R             = 50,
   seed          = 123

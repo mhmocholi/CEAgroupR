@@ -118,29 +118,31 @@ ordering or different subgroup structures.
 \examples{
 ## Example 1: Basic cost-effectiveness analysis (single dataset)
 res_base <- compute_icers(
-  data      = cua_base,
+  data      = cua_example,
   group     = "group",
   cost      = "cost_total",
   effect    = "effect",
-  ref_group = "g0",
+  ref_group = "usual_care",
   R         = 50,
   seed      = 123
 )
 
-## Example 2: Multi-dataset analysis (base case and discounted scenario)
+## Example 2: Multi-dataset analysis (base case and alternative scenario)
+scenario_alt <- cua_example
+scenario_alt$cost_total <- scenario_alt$cost_total * 1.10
+
 data_list <- list(
-  base_case        = cua_multi,
-  discounted_case = cua_multi_discounted
+  base_case            = cua_example,
+  alternative_scenario = scenario_alt
 )
 
 res_multi <- compute_icers(
-  data       = data_list,
-  group      = "group",
-  cost       = "cost_total",
-  effect     = "effect",
-  ref_group  = "usual_care",
-  R          = 50,
-  seed       = 123
+  data      = data_list,
+  group     = "group",
+  cost      = "cost_total",
+  effect    = "effect",
+  ref_group = "usual_care",
+  R         = 50,
+  seed      = 123
 )
-
 }

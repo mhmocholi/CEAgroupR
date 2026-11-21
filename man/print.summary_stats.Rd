@@ -47,11 +47,11 @@ scenarios.
 \examples{
 ## Example: Print descriptive summaries with custom numeric precision
 summary_base <- summarize_cea_data(
-  data      = cua_base,
+  data      = cua_example,
   group     = "group",
   cost      = "cost_total",
   effect    = "effect",
-  ref_group = "g0",
+  ref_group = "usual_care",
   lambda    = c(20000, 30000)
 )
 

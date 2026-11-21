@@ -5,7 +5,7 @@
 \title{Plot Cost-Effectiveness Acceptability Curves (CEAC)}
 \usage{
 \method{plot}{ceacs}(
-  data,
+  x,
   color_by = NULL,
   shape_by = NULL,
   facet_by = NULL,
@@ -25,7 +25,7 @@
 )
 }
 \arguments{
-\item{data}{Either the output of \code{\link{compute_icers}} or a tibble
+\item{x}{Either the output of \code{\link{compute_icers}} or a tibble
 produced by \code{\link{combine_icers_results}}.}
 
 \item{color_by}{Variable used for colour mapping. \code{NULL} defaults to
@@ -103,7 +103,7 @@ horizontal probability reference lines, vertical WTP markers,
 faceting and user-defined colour and line-type mappings.
 
 This function relies on the internal plotting engine
-\code{\link{ce_plot_base}} to ensure consistent aesthetics and behaviour
+\code{ce_plot_base()} to ensure consistent aesthetics and behaviour
 across all CEAgroupR visualizations.
 
 When \code{plot_by} is specified, the CEAC data are calculated globally
@@ -117,11 +117,11 @@ results to be distinguished through graphical mappings.
 \examples{
 ## Example 1: Basic CEAC for a single dataset
 res <- compute_icers(
-  data      = cua_base,
+  data      = cua_example,
   group     = "group",
   cost      = "cost_total",
   effect    = "effect",
-  ref_group = "g0",
+  ref_group = "usual_care",
   R         = 50,
   seed      = 123
 )
@@ -130,11 +130,11 @@ plot(res, type = "ceacs")
 
 ## Example 2: CEAC with subgroup stratification
 res_subgroups <- compute_icers(
-  data          = cua_base,
+  data          = cua_example,
   group         = "group",
   cost          = "cost_total",
   effect        = "effect",
-  ref_group     = "g0",
+  ref_group     = "usual_care",
   subgroup_vars = "diabetes",
   R             = 50,
   seed          = 123
