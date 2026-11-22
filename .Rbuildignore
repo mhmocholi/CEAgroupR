@@ -6,3 +6,4 @@
 ^Meta$
 ^data-raw$
 ^pkgdown$
+^LICENSE\.md$

@@ -20,34 +20,115 @@ compute_psa(
 )
 }
 \arguments{
-\item{data}{A data frame or named list of data frames.}
+\item{data}{A data frame or named list of data frames.
+The current implementation supports one dataset.}
 
-\item{group}{Variable identifying intervention strategies.}
+\item{group}{Character string identifying the variable containing
+intervention strategies.}
 
-\item{cost}{Variable containing individual total costs.}
+\item{cost}{Character string identifying individual total costs.}
 
-\item{effect}{Variable containing individual effectiveness outcomes.}
+\item{effect}{Character string identifying individual effectiveness
+outcomes.}
 
-\item{parameters}{Object created by define_cea_parameters().}
+\item{parameters}{A \code{cea_parameters} object created by
+\code{\link[=define_cea_parameters]{define_cea_parameters()}}, containing probabilistic
+parameter specifications.}
 
-\item{R}{Number of Monte Carlo iterations.}
+\item{R}{Positive integer specifying the number of Monte Carlo
+iterations. Defaults to 1000.}
 
-\item{lambda}{Willingness-to-pay thresholds.}
+\item{lambda}{Numeric vector of willingness-to-pay thresholds.
+Defaults to 25000.}
 
-\item{subgroup_vars}{Optional subgroup variables.}
+\item{subgroup_vars}{Optional subgroup variables.
+Subgroup analysis is not yet supported.}
 
-\item{seed}{Random seed for reproducibility.}
+\item{seed}{Optional random seed for reproducibility.
+If \code{NULL}, a seed is generated from the system time.}
 
-\item{verbose}{Display simulation progress.}
+\item{verbose}{Logical. If \code{TRUE}, displays a completion message.}
 
-\item{ref_group}{Reference strategy.}
+\item{ref_group}{Character string identifying the reference strategy.}
 
-\item{alt_groups}{Optional alternative strategies.}
+\item{alt_groups}{Optional character vector identifying alternative
+strategies. If \code{NULL}, all non-reference strategies are included.}
 }
 \value{
-A cea_results_list object containing PSA results.
+An object of class \code{cea_results_list} containing:
+
+\describe{
+\item{Dataset results}{
+A dataset-specific \code{cea_results} object containing
+\code{Overall} results for each alternative strategy.
+Each comparison is represented by a \code{cea_psa} object
+containing its Monte Carlo economic outcomes.
+}
+\item{combined_replicates}{
+A tibble containing the economic results for every
+simulation and comparison, including incremental costs,
+incremental effects, ICERs, mean costs, mean effects,
+and net monetary benefits.
+}
+\item{parameter_samples}{
+A tibble containing the simulated values of each
+probabilistic parameter, with one row per iteration.
+}
+\item{parameter_diagnostics}{
+A tibble containing theoretical and simulated distribution
+statistics, together with their differences, for each
+probabilistic parameter.
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{The object has class `cea_parameter_diagnostics` and
+retains the original distribution specifications and
+simulated parameter samples as attributes.
+}\if{html}{\out{</div>}}
+
+}
+\item{settings}{
+A list containing the analysis configuration, random seed,
+number of simulations, willingness-to-pay thresholds,
+and original probabilistic distribution specifications.
+}
+}
 }
 \description{
 Performs Monte Carlo simulations for cost-effectiveness
 and cost-utility analyses.
+}
+\details{
+Probabilistic model parameters are sampled from their specified
+distributions, and the resulting uncertainty is propagated
+through incremental costs, effects, cost-effectiveness ratios,
+and net monetary benefits.
+
+Probabilistic parameters are sampled independently according to
+the distributions specified in \code{parameters}. Supported
+distributions are normal, beta, gamma, lognormal, and uniform.
+
+Cost uncertainty is incorporated by adjusting individual costs
+according to the difference between simulated and baseline
+resource unit costs.
+
+Effect uncertainty is incorporated through multiplicative
+adjustments to incremental effectiveness.
+
+In addition to the economic results, the function produces
+numerical diagnostics comparing the theoretical distributions
+with their Monte Carlo realizations.
+
+For each probabilistic parameter, the diagnostics include
+theoretical and simulated means, medians, standard deviations,
+and 2.5th and 97.5th percentiles.
+
+Differences are calculated as simulated minus theoretical
+values. These diagnostics are descriptive and do not constitute
+formal goodness-of-fit tests.
+
+The diagnostic object also retains the original distribution
+specifications and simulated parameter samples as attributes,
+allowing graphical diagnostics through an S3 plot method.
+
+The current implementation assumes independence between
+probabilistic parameters.
 }

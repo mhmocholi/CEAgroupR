@@ -18,3 +18,20 @@ Invisibly returns \code{x}.
 Displays deterministic, probabilistic and scenario
 parameter tables in a readable console format.
 }
+\details{
+Probabilistic parameters are displayed using a compact
+distribution specification rather than separate columns
+for each possible distribution argument.
+
+For probabilistic parameters, the original distribution
+arguments are combined into a single specification string,
+such as Normal(mean = 65, sd = 10) or
+Gamma(shape = 25, rate = 0.25).
+
+This avoids displaying non-applicable arguments as missing
+values when different distribution families are combined.
+
+The underlying summary tables remain unchanged.
+Deterministic and scenario parameters retain their
+original presentation.
+}

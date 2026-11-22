@@ -4,23 +4,102 @@
 #' Performs Monte Carlo simulations for cost-effectiveness
 #' and cost-utility analyses.
 #'
-#' @param data A data frame or named list of data frames.
-#' @param group Variable identifying intervention strategies.
-#' @param cost Variable containing individual total costs.
-#' @param effect Variable containing individual effectiveness outcomes.
-#' @param parameters Object created by define_cea_parameters().
-#' @param R Number of Monte Carlo iterations.
-#' @param lambda Willingness-to-pay thresholds.
-#' @param subgroup_vars Optional subgroup variables.
-#' @param seed Random seed for reproducibility.
-#' @param verbose Display simulation progress.
-#' @param ref_group Reference strategy.
-#' @param alt_groups Optional alternative strategies.
+#' Probabilistic model parameters are sampled from their specified
+#' distributions, and the resulting uncertainty is propagated
+#' through incremental costs, effects, cost-effectiveness ratios,
+#' and net monetary benefits.
 #'
-#' @return A cea_results_list object containing PSA results.
+#' @param data A data frame or named list of data frames.
+#'   The current implementation supports one dataset.
+#' @param group Character string identifying the variable containing
+#'   intervention strategies.
+#' @param cost Character string identifying individual total costs.
+#' @param effect Character string identifying individual effectiveness
+#'   outcomes.
+#' @param parameters A `cea_parameters` object created by
+#'   [define_cea_parameters()], containing probabilistic
+#'   parameter specifications.
+#' @param R Positive integer specifying the number of Monte Carlo
+#'   iterations. Defaults to 1000.
+#' @param lambda Numeric vector of willingness-to-pay thresholds.
+#'   Defaults to 25000.
+#' @param subgroup_vars Optional subgroup variables.
+#'   Subgroup analysis is not yet supported.
+#' @param seed Optional random seed for reproducibility.
+#'   If `NULL`, a seed is generated from the system time.
+#' @param verbose Logical. If `TRUE`, displays a completion message.
+#' @param ref_group Character string identifying the reference strategy.
+#' @param alt_groups Optional character vector identifying alternative
+#'   strategies. If `NULL`, all non-reference strategies are included.
+#'
+#' @details
+#' Probabilistic parameters are sampled independently according to
+#' the distributions specified in `parameters`. Supported
+#' distributions are normal, beta, gamma, lognormal, and uniform.
+#'
+#' Cost uncertainty is incorporated by adjusting individual costs
+#' according to the difference between simulated and baseline
+#' resource unit costs.
+#'
+#' Effect uncertainty is incorporated through multiplicative
+#' adjustments to incremental effectiveness.
+#'
+#' In addition to the economic results, the function produces
+#' numerical diagnostics comparing the theoretical distributions
+#' with their Monte Carlo realizations.
+#'
+#' For each probabilistic parameter, the diagnostics include
+#' theoretical and simulated means, medians, standard deviations,
+#' and 2.5th and 97.5th percentiles.
+#'
+#' Differences are calculated as simulated minus theoretical
+#' values. These diagnostics are descriptive and do not constitute
+#' formal goodness-of-fit tests.
+#'
+#' The diagnostic object also retains the original distribution
+#' specifications and simulated parameter samples as attributes,
+#' allowing graphical diagnostics through an S3 plot method.
+#'
+#' The current implementation assumes independence between
+#' probabilistic parameters.
+#'
+#' @return
+#' An object of class `cea_results_list` containing:
+#'
+#' \describe{
+#'   \item{Dataset results}{
+#'     A dataset-specific `cea_results` object containing
+#'     `Overall` results for each alternative strategy.
+#'     Each comparison is represented by a `cea_psa` object
+#'     containing its Monte Carlo economic outcomes.
+#'   }
+#'   \item{combined_replicates}{
+#'     A tibble containing the economic results for every
+#'     simulation and comparison, including incremental costs,
+#'     incremental effects, ICERs, mean costs, mean effects,
+#'     and net monetary benefits.
+#'   }
+#'   \item{parameter_samples}{
+#'     A tibble containing the simulated values of each
+#'     probabilistic parameter, with one row per iteration.
+#'   }
+#'   \item{parameter_diagnostics}{
+#'     A tibble containing theoretical and simulated distribution
+#'     statistics, together with their differences, for each
+#'     probabilistic parameter.
+#'
+#'     The object has class `cea_parameter_diagnostics` and
+#'     retains the original distribution specifications and
+#'     simulated parameter samples as attributes.
+#'   }
+#'   \item{settings}{
+#'     A list containing the analysis configuration, random seed,
+#'     number of simulations, willingness-to-pay thresholds,
+#'     and original probabilistic distribution specifications.
+#'   }
+#' }
 #'
 #' @export
-
 compute_psa <- function(
     data, group, cost, effect,
     parameters,
@@ -210,6 +289,176 @@ compute_psa <- function(
   }
 
   # ============================================================
+  # 3A. Numerical diagnostics of parameter distributions
+  # ============================================================
+
+  diagnose_parameter_distribution <- function(
+    parameter_name, spec, samples
+  ) {
+
+    distribution <- spec$distribution
+
+    # Theoretical mean and standard deviation
+    theoretical_moments <- switch(
+      distribution,
+
+      normal = c(
+        mean = spec$mean,
+        sd = spec$sd
+      ),
+
+      beta = c(
+        mean = spec$shape1 /
+          (spec$shape1 + spec$shape2),
+        sd = sqrt(
+          (spec$shape1 * spec$shape2) /
+            (
+              (spec$shape1 + spec$shape2)^2 *
+                (spec$shape1 + spec$shape2 + 1)
+            )
+        )
+      ),
+
+      gamma = c(
+        mean = spec$shape / spec$rate,
+        sd = sqrt(spec$shape) / spec$rate
+      ),
+
+      lognormal = c(
+        mean = exp(
+          spec$meanlog + spec$sdlog^2 / 2
+        ),
+        sd = sqrt(
+          (exp(spec$sdlog^2) - 1) *
+            exp(2 * spec$meanlog + spec$sdlog^2)
+        )
+      ),
+
+      uniform = c(
+        mean = (spec$min + spec$max) / 2,
+        sd = (spec$max - spec$min) / sqrt(12)
+      ),
+
+      stop(
+        "Unsupported probability distribution: ",
+        distribution
+      )
+    )
+
+    # Theoretical quantiles
+    probabilities <- c(0.025, 0.5, 0.975)
+
+    theoretical_quantiles <- switch(
+      distribution,
+
+      normal = stats::qnorm(
+        probabilities,
+        mean = spec$mean,
+        sd = spec$sd
+      ),
+
+      beta = stats::qbeta(
+        probabilities,
+        shape1 = spec$shape1,
+        shape2 = spec$shape2
+      ),
+
+      gamma = stats::qgamma(
+        probabilities,
+        shape = spec$shape,
+        rate = spec$rate
+      ),
+
+      lognormal = stats::qlnorm(
+        probabilities,
+        meanlog = spec$meanlog,
+        sdlog = spec$sdlog
+      ),
+
+      uniform = stats::qunif(
+        probabilities,
+        min = spec$min,
+        max = spec$max
+      )
+    )
+
+    theoretical <- c(
+      mean = unname(theoretical_moments["mean"]),
+      median = theoretical_quantiles[2],
+      sd = unname(theoretical_moments["sd"]),
+      p2.5 = theoretical_quantiles[1],
+      p97.5 = theoretical_quantiles[3]
+    )
+
+    # Empirical statistics
+    empirical_quantiles <- stats::quantile(
+      samples,
+      probs = probabilities,
+      names = FALSE
+    )
+
+    empirical <- c(
+      mean = mean(samples),
+      median = empirical_quantiles[2],
+      sd = stats::sd(samples),
+      p2.5 = empirical_quantiles[1],
+      p97.5 = empirical_quantiles[3]
+    )
+
+    # Differences: simulated minus theoretical
+    differences <- empirical - theoretical
+
+    data.frame(
+      parameter = parameter_name,
+      distribution = distribution,
+      R = length(samples),
+
+      mean_theoretical = theoretical["mean"],
+      mean_simulated = empirical["mean"],
+      mean_difference = differences["mean"],
+
+      median_theoretical = theoretical["median"],
+      median_simulated = empirical["median"],
+      median_difference = differences["median"],
+
+      sd_theoretical = theoretical["sd"],
+      sd_simulated = empirical["sd"],
+      sd_difference = differences["sd"],
+
+      p2.5_theoretical = theoretical["p2.5"],
+      p2.5_simulated = empirical["p2.5"],
+      p2.5_difference = differences["p2.5"],
+
+      p97.5_theoretical = theoretical["p97.5"],
+      p97.5_simulated = empirical["p97.5"],
+      p97.5_difference = differences["p97.5"],
+
+      row.names = NULL,
+      check.names = FALSE
+    )
+  }
+
+  parameter_diagnostics <- do.call(
+    rbind,
+    lapply(names(prob_params), function(nm) {
+
+      diagnose_parameter_distribution(
+        parameter_name = nm,
+        spec = prob_params[[nm]]$probabilistic,
+        samples = parameter_samples[[nm]]
+      )
+    })
+  )
+
+  rownames(parameter_diagnostics) <- NULL
+
+  # Preserve original probabilistic specifications
+  settings_env$probabilistic_parameters <- lapply(
+    prob_params,
+    function(p) p$probabilistic
+  )
+
+  # ============================================================
   # 4. Simulate individual costs
   # ============================================================
 
@@ -236,8 +485,10 @@ compute_psa <- function(
 
     if (!is.numeric(df[[resource]]) ||
         any(!is.finite(df[[resource]]))) {
-      stop("Resource variable must contain finite numeric values: ",
-           resource)
+      stop(
+        "Resource variable must contain finite numeric values: ",
+        resource
+      )
     }
 
     cost_matrix <- cost_matrix + outer(
@@ -415,11 +666,23 @@ compute_psa <- function(
   )
 
   # ============================================================
-  # 8. Store parameter samples and settings
+  # 8. Store parameter samples, diagnostics and settings
   # ============================================================
 
   result$parameter_samples <- tibble::as_tibble(
     parameter_samples
+  )
+
+  result$parameter_diagnostics <- structure(
+    tibble::as_tibble(parameter_diagnostics),
+    class = c(
+      "cea_parameter_diagnostics",
+      "tbl_df",
+      "tbl",
+      "data.frame"
+    ),
+    distribution_specs = settings_env$probabilistic_parameters,
+    parameter_samples = result$parameter_samples
   )
 
   result$settings <- settings_env
@@ -427,7 +690,11 @@ compute_psa <- function(
   class(result) <- c("cea_results_list", "list")
 
   if (verbose) {
-    message("PSA completed: ", R, " Monte Carlo iterations.")
+    message(
+      "PSA completed: ",
+      R,
+      " Monte Carlo iterations."
+    )
   }
 
   return(result)
